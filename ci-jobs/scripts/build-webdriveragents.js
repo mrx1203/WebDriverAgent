@@ -13,7 +13,7 @@ async function buildAndUploadWebDriverAgents () {
   for (let xcodePath of xcodePaths) {
     // Build webdriveragent for this xcode version
     log.info(`Running xcode-select for '${xcodePath}'`);
-    await exec('sudo',  ['xcode-select', '-s', xcodePath]);
+    await exec('sudo', ['xcode-select', '-s', xcodePath]);
     await buildWebDriverAgent();
   }
 }
