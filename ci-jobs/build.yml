@@ -1,6 +1,8 @@
 jobs:
   - job: build_and_upload_bundles
     steps:
+    - script: ls /Applications/
+      displayName: List Installed Applications
     - script: npm install
       displayName: Install Node Modules
     - script: node ./ci-jobs/scripts/build-webdriveragents.js
