@@ -14,7 +14,9 @@ async function buildAndUploadWebDriverAgents () {
     // Build webdriveragent for this xcode version
     log.info(`Running xcode-select for '${xcodePath}'`);
     await exec('sudo', ['xcode-select', '-s', `/Applications/${xcodePath}/Contents/Developer`]);
-    await buildWebDriverAgent();
+    const xcodeVersion = xcodePath.replace('.app', '').split('_', 2)[1];
+    log.info('Building webdriveragent for xcode version', xcodeVersion);
+    await buildWebDriverAgent(xcodeVersion);
   }
 
   // Divider log line

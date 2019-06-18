@@ -5,9 +5,9 @@ const xcode = require('appium-xcode');
 
 const log = new logger.getLogger('WDA Build');
 
-async function buildWebDriverAgent () {
+async function buildWebDriverAgent (xcodeVersion) {
   // Get Xcode version
-  const xcodeVersion = await xcode.getVersion();
+  xcodeVersion = xcodeVersion || await xcode.getVersion();
   log.info(`Building bundle for Xcode version '${xcodeVersion}'`);
 
   // Clean and build the dependencies
