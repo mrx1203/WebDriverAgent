@@ -1,5 +1,5 @@
 jobs:
-  - job: Build and Upload WebDriverAgent Bundles
+  - job: build_and_upload_bundles
     steps:
     - script: node ./ci-jobs/scripts/build-and-upload-webdriveragents.js
       displayName: Build WebDriverAgents
