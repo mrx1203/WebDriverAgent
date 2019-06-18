@@ -8,12 +8,12 @@ const log = new logger.getLogger('WDA Build');
 async function buildAndUploadWebDriverAgents () {
   // Get all xcode paths from /Applications/
   const xcodePaths = (await fs.readdir('/Applications/'))
-    .filter((file) => file.toLowerCase().startsWith('xcode_'));
+    .filter((file) => file.toLowerCase().startsWith('xcode'));
 
   for (let xcodePath of xcodePaths) {
     // Build webdriveragent for this xcode version
     log.info(`Running xcode-select for '${xcodePath}'`);
-    await exec('xcode-select', ['-s', xcodePath]);
+    await exec('sudo xcode-select', ['-s', xcodePath]);
 
     await buildWebDriverAgent();
   }
