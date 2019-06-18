@@ -1,6 +1,8 @@
 jobs:
   - job: build_and_upload_bundles
     steps:
+    - script: npm install
+      displayName: Install Node Modules
     - script: node ./ci-jobs/scripts/build-webdriveragents.js
       displayName: Build WebDriverAgents
     - script: echo "UPLOAD EM NOW"
