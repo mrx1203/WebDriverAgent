@@ -1,0 +1,7 @@
+jobs:
+  - job: Build and Upload WebDriverAgent Bundles
+    step:
+    - script: node ./ci-jobs/scripts/build-and-upload-webdriveragents.js
+      displayName: Build WebDriverAgents
+    - script: echo "UPLOAD EM NOW"
+      displayName: Upload to GitHub Releases
