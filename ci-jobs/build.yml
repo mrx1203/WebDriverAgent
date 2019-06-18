@@ -1,5 +1,7 @@
 jobs:
   - job: build_and_upload_bundles
+    pool:
+      vmImage: 'macOS-10.14'
     steps:
     - script: ls /Applications/
       displayName: List Installed Applications
