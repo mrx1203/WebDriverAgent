@@ -54,3 +54,6 @@ Modules/module.modulemap
 
 # node stuff
 node_modules
+
+# webdriveragent zip bundles
+bundles/
