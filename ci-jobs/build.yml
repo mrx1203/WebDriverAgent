@@ -5,6 +5,9 @@ jobs:
     steps:
     - script: ls /Applications/
       displayName: List Installed Applications
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '12.x' 
     - script: npm install
       displayName: Install Node Modules
     - script: node ./ci-jobs/scripts/build-webdriveragents.js
