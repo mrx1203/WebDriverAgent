@@ -8,7 +8,7 @@ const log = new logger.getLogger('WDA Build');
 async function buildAndUploadWebDriverAgents () {
   // Get all xcode paths from /Applications/
   const xcodePaths = (await fs.readdir('/Applications/'))
-    .filter((file) => file.toLowerCase().startsWith('xcode'));
+    .filter((file) => file.toLowerCase().startsWith('xcode_'));
 
   for (let xcodePath of xcodePaths) {
     // Build webdriveragent for this xcode version
@@ -16,6 +16,9 @@ async function buildAndUploadWebDriverAgents () {
     await exec('sudo', ['xcode-select', '-s', `/Applications/${xcodePath}/Contents/Developer`]);
     await buildWebDriverAgent();
   }
+
+  // Divider log line
+  log.info('\n');
 }
 
 if (require.main === module) {
