@@ -21,12 +21,12 @@
 #import "XCUIScreen.h"
 #import "FBImageIOScaler.h"
 
-static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.5;
+static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.1;
 static const NSUInteger MAX_FPS = 60;
 
 static NSString *const SERVER_NAME = @"WDA MJPEG Server";
 static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
-
+static long count = 0;
 
 @interface FBMjpegServer()
 
@@ -35,6 +35,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
 @property (nonatomic, readonly) mach_timebase_info_data_t timebaseInfo;
 @property (nonatomic, readonly) FBImageIOScaler *imageScaler;
 
+@property (nonatomic) double startTime;
 @end
 
 
@@ -52,6 +53,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
     });
     _imageScaler = [[FBImageIOScaler alloc] init];
   }
+  self.startTime = [[NSDate date] timeIntervalSince1970];
   return self;
 }
 
@@ -134,10 +136,27 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
 }
 
 - (void)sendScreenshot:(NSData *)screenshotData {
-  NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString\r\nContent-type: image/jpg\r\nContent-Length: %@\r\n\r\n", @(screenshotData.length)];
+  //NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString\r\nContent-type: image/jpg\r\nContent-Length: %@\r\n\r\n", @(screenshotData.length)];
+  UIInterfaceOrientation orientation = UIDeviceOrientationPortrait;
+  @try {
+    FBApplication *systemApp = FBApplication.fb_systemApplication;
+    orientation = systemApp.interfaceOrientation;
+  }@catch(NSException *e) {
+    NSLog(@"%@",e);
+  }
+  
+  NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString--Content-type: image/jpg--=%d=",orientation];
   NSMutableData *chunk = [[chunkHeader dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
   [chunk appendData:screenshotData];
-  [chunk appendData:(id)[@"\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding]];
+  count+=1;
+  double losttime = [[NSDate date] timeIntervalSince1970]-self.startTime;
+  if(losttime>=1){
+    //NSLog(@"===================framerate is %f",count/losttime);
+    count = 0;
+    self.startTime = [[NSDate date] timeIntervalSince1970];
+  }
+  //[chunk appendData:(id)[@"\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding]];
+  //NSLog(@"===================send image data %d",orientation);
   @synchronized (self.activeClients) {
     for (GCDAsyncSocket *client in self.activeClients) {
       [client writeData:chunk withTimeout:-1 tag:0];
@@ -157,8 +176,8 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
 
 - (void)didClientConnect:(GCDAsyncSocket *)newClient activeClients:(NSArray<GCDAsyncSocket *> *)activeClients
 {
-  NSString *streamHeader = [NSString stringWithFormat:@"HTTP/1.0 200 OK\r\nServer: %@\r\nConnection: close\r\nMax-Age: 0\r\nExpires: 0\r\nCache-Control: no-cache, private\r\nPragma: no-cache\r\nContent-Type: multipart/x-mixed-replace; boundary=--BoundaryString\r\n\r\n", SERVER_NAME];
-  [newClient writeData:(id)[streamHeader dataUsingEncoding:NSUTF8StringEncoding] withTimeout:-1 tag:0];
+  //NSString *streamHeader = [NSString stringWithFormat:@"HTTP/1.0 200 OK\r\nServer: %@\r\nConnection: close\r\nMax-Age: 0\r\nExpires: 0\r\nCache-Control: no-cache, private\r\nPragma: no-cache\r\nContent-Type: multipart/x-mixed-replace; boundary=--BoundaryString\r\n\r\n", SERVER_NAME];
+  //[newClient writeData:(id)[streamHeader dataUsingEncoding:NSUTF8StringEncoding] withTimeout:-1 tag:0];
   @synchronized (self.activeClients) {
     [self.activeClients removeAllObjects];
     [self.activeClients addObjectsFromArray:activeClients];

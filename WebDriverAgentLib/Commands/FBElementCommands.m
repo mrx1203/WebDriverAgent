@@ -34,11 +34,11 @@
 #import "XCUIElement+FBTyping.h"
 #import "XCUIElement+FBUtilities.h"
 #import "XCUIElement+FBWebDriverAttributes.h"
-#import "XCUIElement+FBTVFocuse.h"
 #import "FBElementTypeTransformer.h"
 #import "XCUIElement.h"
 #import "XCUIElementQuery.h"
 #import "FBXCodeCompatibility.h"
+#import "XCEventGenerator.h"
 
 @interface FBElementCommands ()
 @end
@@ -67,10 +67,6 @@
     [[FBRoute GET:@"/screenshot/:uuid"] respondWithTarget:self action:@selector(handleElementScreenshot:)],
     [[FBRoute GET:@"/wda/element/:uuid/accessible"] respondWithTarget:self action:@selector(handleGetAccessible:)],
     [[FBRoute GET:@"/wda/element/:uuid/accessibilityContainer"] respondWithTarget:self action:@selector(handleGetIsAccessibilityContainer:)],
-#if TARGET_OS_TV
-    [[FBRoute GET:@"/element/:uuid/attribute/focused"] respondWithTarget:self action:@selector(handleGetFocused:)],
-    [[FBRoute POST:@"/wda/element/:uuid/focuse"] respondWithTarget:self action:@selector(handleFocuse:)],
-#else
     [[FBRoute POST:@"/wda/element/:uuid/swipe"] respondWithTarget:self action:@selector(handleSwipe:)],
     [[FBRoute POST:@"/wda/element/:uuid/pinch"] respondWithTarget:self action:@selector(handlePinch:)],
     [[FBRoute POST:@"/wda/element/:uuid/doubleTap"] respondWithTarget:self action:@selector(handleDoubleTap:)],
@@ -82,10 +78,13 @@
     [[FBRoute POST:@"/wda/tap/:uuid"] respondWithTarget:self action:@selector(handleTap:)],
     [[FBRoute POST:@"/wda/touchAndHold"] respondWithTarget:self action:@selector(handleTouchAndHoldCoordinate:)],
     [[FBRoute POST:@"/wda/doubleTap"] respondWithTarget:self action:@selector(handleDoubleTapCoordinate:)],
-    [[FBRoute POST:@"/wda/pickerwheel/:uuid/select"] respondWithTarget:self action:@selector(handleWheelSelect:)],
-#endif
     [[FBRoute POST:@"/wda/keys"] respondWithTarget:self action:@selector(handleKeys:)],
+    [[FBRoute POST:@"/wda/pickerwheel/:uuid/select"] respondWithTarget:self action:@selector(handleWheelSelect:)],
     [[FBRoute POST:@"/wda/element/:uuid/forceTouch"] respondWithTarget:self action:@selector(handleForceTouch:)],
+    
+    //用于远程控制的接口
+    //[[FBRoute POST:@"/wda/swipe_control"] respondWithTarget:self action:@selector(handleSwipe_Control:)],
+    //[[FBRoute POST:@"/wda/click_control"] respondWithTarget:self action:@selector(handleClick_Control:)],
   ];
 }
 
@@ -168,12 +167,10 @@
   if ([value isKindOfClass:[NSArray class]]) {
     textToType = [value componentsJoinedByString:@""];
   }
-#if !TARGET_OS_TV
   if (element.elementType == XCUIElementTypePickerWheel) {
     [element adjustToPickerWheelValue:textToType];
     return FBResponseWithOK();
   }
-#endif
   if (element.elementType == XCUIElementTypeSlider) {
     CGFloat sliderValue = textToType.floatValue;
     if (sliderValue < 0.0 || sliderValue > 1.0 ) {
@@ -196,11 +193,7 @@
   NSString *elementUUID = request.parameters[@"uuid"];
   XCUIElement *element = [elementCache elementForUUID:elementUUID];
   NSError *error = nil;
-#if TARGET_OS_IOS
   if (![element fb_tapWithError:&error]) {
-#elif TARGET_OS_TV
-  if (![element fb_selectWithError:&error]) {
-#endif
     return FBResponseWithError(error);
   }
   return FBResponseWithElementUUID(elementUUID);
@@ -218,43 +211,6 @@
   return FBResponseWithElementUUID(elementUUID);
 }
 
-#if TARGET_OS_TV
-+ (id<FBResponsePayload>)handleGetFocused:(FBRouteRequest *)request
-{
-  // `BOOL isFocused = [elementCache elementForUUID:request.parameters[@"uuid"]];`
-  // returns wrong true/false after moving focus by key up/down, for example.
-  // Thus, ensure the focus compares the status with `fb_focusedElement`.
-  BOOL isFocused = NO;
-  XCUIElement *focusedElement = request.session.activeApplication.fb_focusedElement;
-  if (focusedElement != nil) {
-    FBElementCache *elementCache = request.session.elementCache;
-    NSString *focusedUUID = [elementCache storeElement:focusedElement];
-    if ([focusedUUID isEqualToString:request.parameters[@"uuid"]]) {
-      isFocused = YES;
-    }
-  }
-
-  return FBResponseWithStatus(FBCommandStatusNoError, isFocused ? @YES : @NO);
-}
-
-+ (id<FBResponsePayload>)handleFocuse:(FBRouteRequest *)request
-{
-  NSString *elementUUID = request.parameters[@"uuid"];
-  FBElementCache *elementCache = request.session.elementCache;
-  XCUIElement *element = [elementCache elementForUUID:elementUUID];
-  NSError *error;
-
-  if (!element) {
-    return FBResponseWithErrorFormat(@"'%@' element uuid didn't match any elements. Try find the element again.",
-                                     elementUUID);
-  }
-
-  if (![element fb_setFocusWithError:&error]) {
-    return FBResponseWithError(error);
-  }
-  return FBResponseWithElementUUID(elementUUID);
-}
-#else
 + (id<FBResponsePayload>)handleDoubleTap:(FBRouteRequest *)request
 {
   FBElementCache *elementCache = request.session.elementCache;
@@ -292,6 +248,26 @@
   CGPoint touchPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
   XCUICoordinate *pressCoordinate = [self.class gestureCoordinateWithCoordinate:touchPoint application:request.session.activeApplication shouldApplyOrientationWorkaround:isSDKVersionLessThan(@"11.0")];
   [pressCoordinate pressForDuration:[request.arguments[@"duration"] doubleValue]];
+  return FBResponseWithOK();
+}
+
++ (id<FBResponsePayload>)handleForceTouch:(FBRouteRequest *)request
+{
+  FBElementCache *elementCache = request.session.elementCache;
+  XCUIElement *element = [elementCache elementForUUID:request.parameters[@"uuid"]];
+  double pressure = [request.arguments[@"pressure"] doubleValue];
+  double duration = [request.arguments[@"duration"] doubleValue];
+  NSError *error;
+  if (nil != request.arguments[@"x"] && nil != request.arguments[@"y"]) {
+    CGPoint forceTouchPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
+    if (![element fb_forceTouchCoordinate:forceTouchPoint pressure:pressure duration:duration error:&error]) {
+      return FBResponseWithError(error);
+    }
+  } else {
+    if (![element fb_forceTouchWithPressure:pressure duration:duration error:&error]) {
+      return FBResponseWithError(error);
+    }
+  }
   return FBResponseWithOK();
 }
 
@@ -418,33 +394,13 @@
   [element pinchWithScale:scale velocity:velocity];
   return FBResponseWithOK();
 }
-#endif
-
-+ (id<FBResponsePayload>)handleForceTouch:(FBRouteRequest *)request
-{
-  FBElementCache *elementCache = request.session.elementCache;
-  XCUIElement *element = [elementCache elementForUUID:request.parameters[@"uuid"]];
-  double pressure = [request.arguments[@"pressure"] doubleValue];
-  double duration = [request.arguments[@"duration"] doubleValue];
-  NSError *error;
-  if (nil != request.arguments[@"x"] && nil != request.arguments[@"y"]) {
-    CGPoint forceTouchPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
-    if (![element fb_forceTouchCoordinate:forceTouchPoint pressure:pressure duration:duration error:&error]) {
-      return FBResponseWithError(error);
-    }
-  } else {
-    if (![element fb_forceTouchWithPressure:pressure duration:duration error:&error]) {
-      return FBResponseWithError(error);
-    }
-  }
-  return FBResponseWithOK();
-}
 
 + (id<FBResponsePayload>)handleKeys:(FBRouteRequest *)request
 {
-  NSString *textToType = [request.arguments[@"value"] componentsJoinedByString:@""];
+  NSString *textToType = request.arguments[@"value"];//[request.arguments[@"value"] componentsJoinedByString:@""];
   NSUInteger frequency = [request.arguments[@"frequency"] unsignedIntegerValue] ?: [FBConfiguration maxTypingFrequency];
   NSError *error;
+  //NSLog(@"========== value=%@   freq=%d",textToType,frequency);
   if (![FBKeyboard typeText:textToType frequency:frequency error:&error]) {
     return FBResponseWithError(error);
   }
@@ -453,12 +409,8 @@
 
 + (id<FBResponsePayload>)handleGetWindowSize:(FBRouteRequest *)request
 {
-#if TARGET_OS_TV
-  CGSize screenSize = request.session.activeApplication.frame.size;
-#else
   CGRect frame = request.session.activeApplication.wdFrame;
   CGSize screenSize = FBAdjustDimensionsForApplication(frame.size, request.session.activeApplication.interfaceOrientation);
-#endif
   return FBResponseWithStatus(FBCommandStatusNoError, @{
     @"width": @(screenSize.width),
     @"height": @(screenSize.height),
@@ -478,8 +430,6 @@
   return FBResponseWithObject(screenshot);
 }
 
-
-#if !TARGET_OS_TV
 static const CGFloat DEFAULT_OFFSET = (CGFloat)0.2;
 
 + (id<FBResponsePayload>)handleWheelSelect:(FBRouteRequest *)request
@@ -583,6 +533,25 @@ static const CGFloat DEFAULT_OFFSET = (CGFloat)0.2;
   XCUICoordinate *appCoordinate = [[XCUICoordinate alloc] initWithElement:element normalizedOffset:CGVectorMake(0, 0)];
   return [[XCUICoordinate alloc] initWithCoordinate:appCoordinate pointsOffset:CGVectorMake(coordinate.x, coordinate.y)];
 }
-#endif
+/*
++ (id<FBResponsePayload>)handleClick_Control:(FBRouteRequest *)request
+{
+  CGPoint tapPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
+  double duration = [request.arguments[@"duration"] doubleValue];
+  //NSLog(@"x=%@ y=%@ duration=%@",request.arguments[@"x"],request.arguments[@"y"],request.arguments[@"duration"]);
+  //[[XCEventGenerator sharedGenerator] pressAtPoint:tapPoint forDuration:duration liftAtPoint:tapPoint velocity:500 orientation:0 name:@"tap" handler:*(XCSynthesizedEventRecord *record,NSError *error){}];
+  [[XCEventGenerator sharedGenerator] pressAtPoint:tapPoint forDuration:duration orientation:0 handler:^(XCSynthesizedEventRecord *record, NSError *error) {} ];
+  return FBResponseWithOK();
+}
 
++ (id<FBResponsePayload>)handleSwipe_Control:(FBRouteRequest *)request
+{
+  CGPoint startPoint = CGPointMake((CGFloat)[request.arguments[@"fromX"] doubleValue], (CGFloat)[request.arguments[@"fromY"] doubleValue]);
+  CGPoint endPoint = CGPointMake((CGFloat)[request.arguments[@"toX"] doubleValue], (CGFloat)[request.arguments[@"toY"] doubleValue]);
+  NSTimeInterval duration = [request.arguments[@"duration"] doubleValue];
+  
+  [[XCEventGenerator sharedGenerator] pressAtPoint:startPoint forDuration:duration liftAtPoint:endPoint velocity:500 orientation:0 name:@"drag" handler:^(XCSynthesizedEventRecord *record,NSError *error){}];
+  return FBResponseWithOK();
+}
+*/
 @end

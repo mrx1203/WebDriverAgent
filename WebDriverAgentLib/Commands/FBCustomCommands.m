@@ -28,6 +28,7 @@
 #import "XCUIElement.h"
 #import "XCUIElement+FBIsVisible.h"
 #import "XCUIElementQuery.h"
+#import "XCEventGenerator.h"
 
 @implementation FBCustomCommands
 
@@ -48,13 +49,15 @@
     [[FBRoute GET:@"/wda/screen"] respondWithTarget:self action:@selector(handleGetScreen:)],
     [[FBRoute GET:@"/wda/activeAppInfo"] respondWithTarget:self action:@selector(handleActiveAppInfo:)],
     [[FBRoute GET:@"/wda/activeAppInfo"].withoutSession respondWithTarget:self action:@selector(handleActiveAppInfo:)],
-#if !TARGET_OS_TV // tvOS does not provide relevant APIs
     [[FBRoute POST:@"/wda/setPasteboard"] respondWithTarget:self action:@selector(handleSetPasteboard:)],
     [[FBRoute POST:@"/wda/getPasteboard"] respondWithTarget:self action:@selector(handleGetPasteboard:)],
-    [[FBRoute GET:@"/wda/batteryInfo"] respondWithTarget:self action:@selector(handleGetBatteryInfo:)],
-#endif
+    [[FBRoute GET:@"/wda/batteryInfo"].withoutSession respondWithTarget:self action:@selector(handleGetBatteryInfo:)],
     [[FBRoute POST:@"/wda/pressButton"] respondWithTarget:self action:@selector(handlePressButtonCommand:)],
     [[FBRoute POST:@"/wda/siri/activate"] respondWithTarget:self action:@selector(handleActivateSiri:)],
+    
+	//用于远程控制的接口
+    [[FBRoute POST:@"/wda/swipe_control"].withoutSession respondWithTarget:self action:@selector(handleSwipe_Control:)],
+    [[FBRoute POST:@"/wda/click_control"].withoutSession respondWithTarget:self action:@selector(handleClick_Control:)],
   ];
 }
 
@@ -132,6 +135,7 @@
                         @"height": @(statusBarSize.height),
                         },
     @"scale": @([FBScreen scale]),
+    @"func":@"screen"
     });
 }
 
@@ -169,7 +173,6 @@
   });
 }
 
-#if !TARGET_OS_TV
 + (id<FBResponsePayload>)handleSetPasteboard:(FBRouteRequest *)request
 {
   NSString *contentType = request.arguments[@"contentType"] ?: @"plaintext";
@@ -193,8 +196,10 @@
   if (nil == result) {
     return FBResponseWithError(error);
   }
-  return FBResponseWithStatus(FBCommandStatusNoError,
-                              [result base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength]);
+  return FBResponseWithStatus(FBCommandStatusNoError,@{
+              @"content":[result base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength],
+              @"func":@"getPasteboard"
+              });
 }
 
 + (id<FBResponsePayload>)handleGetBatteryInfo:(FBRouteRequest *)request
@@ -204,10 +209,10 @@
   }
   return FBResponseWithStatus(FBCommandStatusNoError, @{
     @"level": @([UIDevice currentDevice].batteryLevel),
-    @"state": @([UIDevice currentDevice].batteryState)
+    @"state": @([UIDevice currentDevice].batteryState),
+    @"func":@"batteryInfo"
   });
 }
-#endif
 
 + (id<FBResponsePayload>)handlePressButtonCommand:(FBRouteRequest *)request
 {
@@ -227,4 +232,23 @@
   return FBResponseWithOK();
 }
 
++ (id<FBResponsePayload>)handleClick_Control:(FBRouteRequest *)request
+{
+  CGPoint tapPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
+  double duration = [request.arguments[@"duration"] doubleValue];
+  //NSLog(@"x=%@ y=%@ duration=%@",request.arguments[@"x"],request.arguments[@"y"],request.arguments[@"duration"]);
+  //[[XCEventGenerator sharedGenerator] pressAtPoint:tapPoint forDuration:duration liftAtPoint:tapPoint velocity:500 orientation:0 name:@"tap" handler:*(XCSynthesizedEventRecord *record,NSError *error){}];
+  [[XCEventGenerator sharedGenerator] pressAtPoint:tapPoint forDuration:duration orientation:0 handler:^(XCSynthesizedEventRecord *record, NSError *error) {} ];
+  return FBResponseWithOK();
+}
+
++ (id<FBResponsePayload>)handleSwipe_Control:(FBRouteRequest *)request
+{
+  CGPoint startPoint = CGPointMake((CGFloat)[request.arguments[@"fromX"] doubleValue], (CGFloat)[request.arguments[@"fromY"] doubleValue]);
+  CGPoint endPoint = CGPointMake((CGFloat)[request.arguments[@"toX"] doubleValue], (CGFloat)[request.arguments[@"toY"] doubleValue]);
+  NSTimeInterval duration = [request.arguments[@"duration"] doubleValue];
+  
+  [[XCEventGenerator sharedGenerator] pressAtPoint:startPoint forDuration:duration liftAtPoint:endPoint velocity:500 orientation:0 name:@"drag" handler:^(XCSynthesizedEventRecord *record,NSError *error){}];
+  return FBResponseWithOK();
+}
 @end

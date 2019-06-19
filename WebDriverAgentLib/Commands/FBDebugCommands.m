@@ -59,7 +59,10 @@ static NSString *const SOURCE_FORMAT_DESCRIPTION = @"description";
   if (nil == result) {
     return FBResponseWithErrorFormat(@"Cannot get '%@' source of the current application", sourceType);
   }
-  return FBResponseWithObject(result);
+  return FBResponseWithStatus(FBCommandStatusNoError, @{
+      @"func":@"source",
+      @"value":result
+    });
 }
 
 + (id<FBResponsePayload>)handleGetAccessibleSourceCommand:(FBRouteRequest *)request
