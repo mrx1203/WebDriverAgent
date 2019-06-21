@@ -23,8 +23,3 @@
     }]); \
     XCTAssertNil(__error); \
   })
-
-#define FBWaitExact(timeoutSeconds) \
-  ({ \
-    [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:(timeoutSeconds)]]; \
-  })

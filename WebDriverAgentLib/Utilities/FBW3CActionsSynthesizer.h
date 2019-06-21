@@ -11,10 +11,8 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-#if !TARGET_OS_TV
 @interface FBW3CActionsSynthesizer : FBBaseActionsSynthesizer
 
 @end
-#endif
 
 NS_ASSUME_NONNULL_END

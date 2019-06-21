@@ -14,7 +14,6 @@
 #import "XCUIElement.h"
 #import "XCUIElement+FBUtilities.h"
 #import "XCUIElement+FBWebDriverAttributes.h"
-#import "FBXCodeCompatibility.h"
 
 const int ELEMENT_CACHE_SIZE = 1024;
 
@@ -48,7 +47,7 @@ const int ELEMENT_CACHE_SIZE = 1024;
     return nil;
   }
   XCUIElement *element = [self.elementCache objectForKey:uuid];
-  [element fb_nativeResolve];
+  [element resolve];
   return element;
 }
 

@@ -35,7 +35,7 @@
   });
   self.testedView = self.testedApplication.otherElements[@"MainView"];
   XCTAssertTrue(self.testedView.exists);
-  [self.testedView fb_nativeResolve];
+  [self.testedView resolve];
 }
 
 - (void)testDescendantsWithClassName

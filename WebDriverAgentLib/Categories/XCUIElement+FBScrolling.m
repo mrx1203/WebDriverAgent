@@ -15,7 +15,6 @@
 #import "FBMacros.h"
 #import "FBMathUtils.h"
 #import "FBPredicate.h"
-#import "FBXCodeCompatibility.h"
 #import "XCUIApplication+FBTouchAction.h"
 #import "XCElementSnapshot+FBHelpers.h"
 #import "XCElementSnapshot.h"
@@ -34,8 +33,6 @@ const CGFloat FBScrollBoundingVelocityPadding = 0.0f;
 const CGFloat FBScrollTouchProportion = 0.75f;
 const CGFloat FBScrollCoolOffTime = 1.f;
 const CGFloat FBMinimumTouchEventDelay = 0.1f;
-
-#if !TARGET_OS_TV
 
 @interface XCElementSnapshot (FBScrolling)
 
@@ -84,7 +81,7 @@ const CGFloat FBMinimumTouchEventDelay = 0.1f;
 
 - (BOOL)fb_scrollToVisibleWithNormalizedScrollDistance:(CGFloat)normalizedScrollDistance scrollDirection:(FBXCUIElementScrollDirection)scrollDirection error:(NSError **)error
 {
-  [self fb_nativeResolve];
+  [self resolve];
   if (self.fb_isVisible) {
     return YES;
   }
@@ -162,7 +159,7 @@ const CGFloat FBMinimumTouchEventDelay = 0.1f;
         [scrollView fb_scrollDownByNormalizedDistance:normalizedScrollDistance inApplication:self.application] :
         [scrollView fb_scrollRightByNormalizedDistance:normalizedScrollDistance inApplication:self.application];
     }
-    [self fb_nativeResolve]; // Resolve is needed for correct visibility
+    [self resolve]; // Resolve is needed for correct visibility
     scrollCount++;
   }
 
@@ -314,5 +311,3 @@ const CGFloat FBMinimumTouchEventDelay = 0.1f;
 }
 
 @end
-
-#endif

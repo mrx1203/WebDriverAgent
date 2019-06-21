@@ -16,7 +16,6 @@
 #import "XCUIElement+FBIsVisible.h"
 #import "XCUIElement+FBUtilities.h"
 #import "XCUIElement+FBWebDriverAttributes.h"
-#import "FBXCodeCompatibility.h"
 
 @interface XCElementSnapshotHelperTests : FBIntegrationTestCase
 @property (nonatomic, strong) XCUIElement *testedView;
@@ -33,7 +32,7 @@
   });
   self.testedView = self.testedApplication.otherElements[@"MainView"];
   XCTAssertTrue(self.testedView.exists);
-  [self.testedView fb_nativeResolve];
+  [self.testedView resolve];
 }
 
 - (void)testDescendantsMatchingType
@@ -58,7 +57,7 @@
 {
   XCUIElement *button = self.testedApplication.buttons[@"Alerts"];
   XCTAssertTrue(button.exists);
-  [button fb_nativeResolve];
+  [button resolve];
   XCElementSnapshot *windowSnapshot = [button.fb_lastSnapshot fb_parentMatchingType:XCUIElementTypeWindow];
   XCTAssertNotNil(windowSnapshot);
   XCTAssertEqual(windowSnapshot.elementType, XCUIElementTypeWindow);
@@ -85,7 +84,7 @@
 {
   XCUIElement *todayPickerWheel = self.testedApplication.pickerWheels[@"Today"];
   XCTAssertTrue(todayPickerWheel.exists);
-  [todayPickerWheel fb_nativeResolve];
+  [todayPickerWheel resolve];
   XCElementSnapshot *datePicker = [todayPickerWheel.fb_lastSnapshot fb_parentMatchingOneOfTypes:@[@(XCUIElementTypeDatePicker), @(XCUIElementTypeWindow)]];
   XCTAssertNotNil(datePicker);
   XCTAssertEqual(datePicker.elementType, XCUIElementTypeDatePicker);
@@ -95,7 +94,7 @@
 {
   XCUIElement *todayPickerWheel = self.testedApplication.pickerWheels[@"Today"];
   XCTAssertTrue(todayPickerWheel.exists);
-  [todayPickerWheel fb_nativeResolve];
+  [todayPickerWheel resolve];
   XCElementSnapshot *otherSnapshot = [todayPickerWheel.fb_lastSnapshot fb_parentMatchingOneOfTypes:@[@(XCUIElementTypeAny), @(XCUIElementTypeWindow)]];
   XCTAssertNotNil(otherSnapshot);
   XCTAssertEqual(otherSnapshot.elementType, XCUIElementTypeOther);
@@ -105,7 +104,7 @@
 {
   XCUIElement *todayPickerWheel = self.testedApplication.pickerWheels[@"Today"];
   XCTAssertTrue(todayPickerWheel.exists);
-  [todayPickerWheel fb_nativeResolve];
+  [todayPickerWheel resolve];
   XCElementSnapshot *otherSnapshot = [todayPickerWheel.fb_lastSnapshot fb_parentMatchingOneOfTypes:@[@(XCUIElementTypeTab), @(XCUIElementTypeLink)]];
   XCTAssertNil(otherSnapshot);
 }
@@ -130,7 +129,7 @@
 - (void)testParentMatchingOneOfTypesWithFilter
 {
   XCUIElement *threeStaticText = self.testedApplication.staticTexts[@"3"];
-  [threeStaticText fb_nativeResolve];
+  [threeStaticText resolve];
   NSArray *acceptedParents = @[
                                @(XCUIElementTypeScrollView),
                                @(XCUIElementTypeCollectionView),
@@ -146,7 +145,7 @@
 - (void)testParentMatchingOneOfTypesWithFilterRetruningNo
 {
   XCUIElement *threeStaticText = self.testedApplication.staticTexts[@"3"];
-  [threeStaticText fb_nativeResolve];
+  [threeStaticText resolve];
   NSArray *acceptedParents = @[
                                @(XCUIElementTypeScrollView),
                                @(XCUIElementTypeCollectionView),
@@ -162,7 +161,7 @@
 - (void)testDescendantsCellSnapshots
 {
   XCUIElement *scrollView = self.testedApplication.scrollViews[@"scrollView"];
-  [scrollView fb_nativeResolve];
+  [scrollView resolve];
   FBAssertWaitTillBecomesTrue(self.testedApplication.staticTexts[@"3"].fb_isVisible);
   NSArray *cells = [scrollView.fb_lastSnapshot fb_descendantsCellSnapshots];
   XCTAssertGreaterThanOrEqual(cells.count, 10);
@@ -191,7 +190,7 @@
 {
   FBAssertWaitTillBecomesTrue(self.testedApplication.staticTexts[@"3"].fb_isVisible);
   XCUIElement *threeStaticText = self.testedApplication.staticTexts[@"3"];
-  [threeStaticText fb_nativeResolve];
+  [threeStaticText resolve];
   XCElementSnapshot *xcuiElementCell = [threeStaticText.fb_lastSnapshot fb_parentCellSnapshot];
   XCTAssertEqual(xcuiElementCell.elementType, 75);
 }

@@ -23,7 +23,7 @@
 {
   return
   @[
-    [[FBRoute POST:@"/wda/touch/perform"] respondWithTarget:self action:@selector(handlePerformAppiumTouchActions:)],
+    [[FBRoute POST:@"/wda/touch/perform"].withoutSession respondWithTarget:self action:@selector(handlePerformAppiumTouchActions:)],
     [[FBRoute POST:@"/wda/touch/multi/perform"] respondWithTarget:self action:@selector(handlePerformAppiumTouchActions:)],
     [[FBRoute POST:@"/actions"] respondWithTarget:self action:@selector(handlePerformW3CTouchActions:)],
   ];
@@ -36,7 +36,7 @@
   XCUIApplication *application = [FBApplication fb_activeApplication];
   NSArray *actions = (NSArray *)request.arguments[@"actions"];
   NSError *error;
-  if (![application fb_performAppiumTouchActions:actions elementCache:nil/*request.session.elementCache*/ error:&error]) {
+  if (![application fb_performAppiumTouchActions:actions elementCache:nil error:&error]) {
     return FBResponseWithError(error);
   }
   return FBResponseWithOK();

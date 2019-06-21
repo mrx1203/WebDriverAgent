@@ -55,7 +55,6 @@ static dispatch_once_t onceTestRunnerDaemonClass;
   }
 }
 
-#if !TARGET_OS_TV
 + (UIInterfaceOrientation)orientationWithApplication:(XCUIApplication *)application
 {
   if (nil == FBXCTRunnerDaemonSessionClass ||
@@ -64,7 +63,6 @@ static dispatch_once_t onceTestRunnerDaemonClass;
   }
   return UIInterfaceOrientationPortrait;
 }
-#endif
 
 + (BOOL)synthesizeEventWithRecord:(XCSynthesizedEventRecord *)record error:(NSError *__autoreleasing*)error
 {

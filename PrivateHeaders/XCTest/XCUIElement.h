@@ -18,9 +18,7 @@
 @property BOOL safeQueryResolutionEnabled; // @synthesize safeQueryResolutionEnabled=_safeQueryResolutionEnabled;
 @property(retain) XCElementSnapshot *lastSnapshot; // @synthesize lastSnapshot=_lastSnapshot;
 @property(readonly) XCUIElementQuery *query; // @synthesize query=_query;
-#if !TARGET_OS_TV
 @property(readonly, nonatomic) UIInterfaceOrientation interfaceOrientation;
-#endif
 @property(readonly, copy) XCUICoordinate *hitPointCoordinate;
 @property(readonly) BOOL isTopLevelTouchBarElement;
 @property(readonly) BOOL isTouchBarElement;
@@ -31,8 +29,6 @@
 
 - (unsigned long long)traits;
 - (void)resolveHandleUIInterruption:(BOOL)arg1;
-// !!! deprecated since Xcode 11.0
-// Do not call directly
 - (void)resolve;
 - (BOOL)_waitForExistenceWithTimeout:(double)arg1;
 - (BOOL)evaluatePredicateForExpectation:(id)arg1 debugMessage:(id *)arg2;
@@ -43,9 +39,6 @@
 - (CGPoint)_hitPointByAttemptingToScrollToVisibleSnapshot:(id)arg1;
 - (void)forcePress;
 
-// Available since Xcode 11.0
-- (_Bool)resolveOrRaiseTestFailure:(_Bool)arg1 error:(id *)arg2;
-- (void)resolveOrRaiseTestFailure;
 // Available since Xcode 10.0
 - (id)screenshot;
 

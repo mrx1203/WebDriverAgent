@@ -20,6 +20,7 @@
 #import "FBXCTestDaemonsProxy.h"
 #import "XCUIScreen.h"
 #import "FBImageIOScaler.h"
+#import "XCAXClient_iOS.h"
 
 static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.1;
 static const NSUInteger MAX_FPS = 60;
@@ -151,7 +152,7 @@ static long count = 0;
   count+=1;
   double losttime = [[NSDate date] timeIntervalSince1970]-self.startTime;
   if(losttime>=1){
-    //NSLog(@"===================framerate is %f",count/losttime);
+    NSLog(@"===================framerate is %f",count/losttime);
     count = 0;
     self.startTime = [[NSDate date] timeIntervalSince1970];
   }
@@ -171,7 +172,7 @@ static long count = 0;
   dispatch_once(&onceCanStream, ^{
     result = [(NSObject *)[FBXCTestDaemonsProxy testRunnerProxy] respondsToSelector:@selector(_XCT_requestScreenshotOfScreenWithID:withRect:uti:compressionQuality:withReply:)];
   });
-  return result;
+  return YES;
 }
 
 - (void)didClientConnect:(GCDAsyncSocket *)newClient activeClients:(NSArray<GCDAsyncSocket *> *)activeClients

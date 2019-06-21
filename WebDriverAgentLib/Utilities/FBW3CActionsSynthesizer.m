@@ -57,7 +57,6 @@ static NSString *const FB_KEY_PARAMETERS = @"parameters";
 static NSString *const FB_KEY_ACTIONS = @"actions";
 
 
-#if !TARGET_OS_TV
 @interface FBW3CGestureItem : FBBaseGestureItem
 
 @property (nullable, readonly, nonatomic) FBBaseGestureItem *previousItem;
@@ -493,4 +492,3 @@ static NSString *const FB_KEY_ACTIONS = @"actions";
 }
 
 @end
-#endif

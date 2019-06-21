@@ -28,12 +28,6 @@
   });
 }
 
-- (void)tearDown
-{
-  [self resetOrientation];
-  [super tearDown];
-}
-
 - (void)testElementScreenshot
 {
   [[XCUIDevice sharedDevice] fb_setDeviceInterfaceOrientation:UIDeviceOrientationLandscapeLeft];

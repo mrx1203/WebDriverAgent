@@ -29,13 +29,12 @@
     [self launchApplication];
     [self goToAlertsPage];
   });
-  [self clearAlert];
 }
 
 - (void)tearDown
 {
-  [self clearAlert];
   [super tearDown];
+  [[FBAlert alertWithApplication:self.testedApplication] dismissWithError:nil];
 }
 
 - (void)showApplicationAlert

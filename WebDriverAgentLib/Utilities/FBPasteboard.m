@@ -11,7 +11,6 @@
 
 #import "FBErrorBuilder.h"
 
-#if !TARGET_OS_TV
 @implementation FBPasteboard
 
 + (BOOL)setData:(NSData *)data forType:(NSString *)type error:(NSError **)error
@@ -82,4 +81,3 @@
 }
 
 @end
-#endif

@@ -15,7 +15,6 @@
 #import "FBElementUtils.h"
 #import "FBConfiguration.h"
 #import "FBResponsePayload.h"
-#import "FBXCodeCompatibility.h"
 
 @interface XCUIElementAttributesTests : FBIntegrationTestCase
 @property (nonatomic, strong) XCUIElement *matchingElement;
@@ -32,7 +31,7 @@
   });
   XCUIElement *testedView = self.testedApplication.otherElements[@"MainView"];
   XCTAssertTrue(testedView.exists);
-  [testedView fb_nativeResolve];
+  [testedView resolve];
   self.matchingElement = [[testedView fb_descendantsMatchingIdentifier:@"Alerts" shouldReturnAfterFirstMatch:YES] firstObject];
   XCTAssertNotNil(self.matchingElement);
 }

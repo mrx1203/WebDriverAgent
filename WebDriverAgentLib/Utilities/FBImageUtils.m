@@ -54,16 +54,6 @@ BOOL FBIsPngImage(NSData *imageData)
   return range.location != NSNotFound;
 }
 
-#if TARGET_OS_TV
-NSData *FBAdjustScreenshotOrientationForApplication(NSData *screenshotData)
-{
-  if (FBIsPngImage(screenshotData)) {
-    return screenshotData;
-  }
-  UIImage *image = [UIImage imageWithData:screenshotData];
-  return (NSData *)UIImagePNGRepresentation(image);
-}
-#else
 NSData *FBAdjustScreenshotOrientationForApplication(NSData *screenshotData, UIInterfaceOrientation orientation)
 {
   UIImageOrientation imageOrientation;
@@ -94,4 +84,3 @@ NSData *FBAdjustScreenshotOrientationForApplication(NSData *screenshotData, UIIn
   // The resulting data should be a PNG image
   return (NSData *)UIImagePNGRepresentation(fixedImage);
 }
-#endif

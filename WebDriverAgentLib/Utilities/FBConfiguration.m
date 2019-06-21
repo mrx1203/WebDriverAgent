@@ -15,17 +15,10 @@
 #import "FBXCodeCompatibility.h"
 #import "XCTestPrivateSymbols.h"
 #import "XCElementSnapshot.h"
-#include <dlfcn.h>
 
 static NSUInteger const DefaultStartingPort = 8100;
 static NSUInteger const DefaultMjpegServerPort = 9100;
 static NSUInteger const DefaultPortRange = 100;
-
-static char const *const controllerPrefBundlePath = "/System/Library/PrivateFrameworks/TextInput.framework/TextInput";
-static NSString *const controllerClassName = @"TIPreferencesController";
-static NSString *const FBKeyboardAutocorrectionKey = @"KeyboardAutocorrection";
-static NSString *const FBKeyboardPredictionKey = @"KeyboardPrediction";
-
 
 static BOOL FBShouldUseTestManagerForVisibilityDetection = NO;
 static BOOL FBShouldUseSingletonTestManager = YES;
@@ -62,6 +55,7 @@ static NSUInteger FBMjpegScalingFactor = 100;
   // Existence of USE_PORT in the environment implies the port range is managed by the launching process.
   if (NSProcessInfo.processInfo.environment[@"USE_PORT"] &&
       [NSProcessInfo.processInfo.environment[@"USE_PORT"] length] > 0) {
+    NSLog(@"===================%@",NSProcessInfo.processInfo.environment[@"USE_PORT"]);
     return NSMakeRange([NSProcessInfo.processInfo.environment[@"USE_PORT"] integerValue] , 1);
   }
 
@@ -76,6 +70,7 @@ static NSUInteger FBMjpegScalingFactor = 100;
   
   if (NSProcessInfo.processInfo.environment[@"MJPEG_SERVER_PORT"] &&
       [NSProcessInfo.processInfo.environment[@"MJPEG_SERVER_PORT"] length] > 0) {
+    NSLog(@"===================%@",NSProcessInfo.processInfo.environment[@"MJPEG_SERVER_PORT"]);
     return [NSProcessInfo.processInfo.environment[@"MJPEG_SERVER_PORT"] integerValue];
   }
 
@@ -191,107 +186,7 @@ static NSUInteger FBMjpegScalingFactor = 100;
   FBScreenshotQuality = quality;
 }
 
-// Works for Simulator and Real devices
-+ (void)configureDefaultKeyboardPreferences
-{
-#if TARGET_OS_SIMULATOR
-  // Force toggle software keyboard on.
-  // This can avoid 'Keyboard is not present' error which can happen
-  // when send_keys are called by client
-  [[UIKeyboardImpl sharedInstance] setAutomaticMinimizationEnabled:NO];
-#endif
-
-  void *handle = dlopen(controllerPrefBundlePath, RTLD_LAZY);
-
-  Class controllerClass = NSClassFromString(controllerClassName);
-
-  TIPreferencesController *controller = [controllerClass sharedPreferencesController];
-  // Auto-Correction in Keyboards
-  if ([controller respondsToSelector:@selector(setAutocorrectionEnabled:)]) {
-    controller.autocorrectionEnabled = NO;
-  } else {
-    [controller setValue:@NO forPreferenceKey:FBKeyboardAutocorrectionKey];
-  }
-
-  // Predictive in Keyboards
-  if ([controller respondsToSelector:@selector(setPredictionEnabled:)]) {
-    controller.predictionEnabled = NO;
-  } else {
-    [controller setValue:@NO forPreferenceKey:FBKeyboardPredictionKey];
-  }
-
-  // To dismiss keyboard tutorial on iOS 11+ (iPad)
-  if (isSDKVersionGreaterThanOrEqualTo(@"11.0")) {
-    [controller setValue:@YES forPreferenceKey:@"DidShowGestureKeyboardIntroduction"];
-  }
-  if (isSDKVersionGreaterThanOrEqualTo(@"13.0")) {
-    [controller setValue:@YES forPreferenceKey:@"DidShowContinuousPathIntroduction"];
-  }
-  [controller synchronizePreferences];
-
-  dlclose(handle);
-}
-
-+ (BOOL)keyboardAutocorrection
-{
-  return [self keyboardsPreference:FBKeyboardAutocorrectionKey];
-}
-
-+ (void)setKeyboardAutocorrection:(BOOL)isEnabled
-{
-  [self configureKeyboardsPreference:@(isEnabled) forPreferenceKey:FBKeyboardAutocorrectionKey];
-}
-
-+ (BOOL)keyboardPrediction
-{
-  return [self keyboardsPreference:FBKeyboardPredictionKey];
-}
-
-+ (void)setKeyboardPrediction:(BOOL)isEnabled
-{
-  [self configureKeyboardsPreference:@(isEnabled) forPreferenceKey:FBKeyboardPredictionKey];
-}
-
 #pragma mark Private
-
-+ (BOOL)keyboardsPreference:(nonnull NSString *)key
-{
-  Class controllerClass = NSClassFromString(controllerClassName);
-  TIPreferencesController *controller = [controllerClass sharedPreferencesController];
-  if ([key isEqualToString:FBKeyboardAutocorrectionKey]) {
-    return [controller boolForPreferenceKey:FBKeyboardAutocorrectionKey];
-  } else if ([key isEqualToString:FBKeyboardPredictionKey]) {
-    return [controller boolForPreferenceKey:FBKeyboardPredictionKey];
-  }
-  @throw [[FBErrorBuilder.builder withDescriptionFormat:@"No available keyboardsPreferenceKey: '%@'", key] build];
-}
-
-+ (void)configureKeyboardsPreference:(nonnull NSValue *)value forPreferenceKey:(nonnull NSString *)key
-{
-  void *handle = dlopen(controllerPrefBundlePath, RTLD_LAZY);
-  Class controllerClass = NSClassFromString(controllerClassName);
-
-  TIPreferencesController *controller = [controllerClass sharedPreferencesController];
-
-  if ([key isEqualToString:FBKeyboardAutocorrectionKey]) {
-    // Auto-Correction in Keyboards
-    if ([controller respondsToSelector:@selector(setAutocorrectionEnabled:)]) {
-      controller.autocorrectionEnabled = value;
-    } else {
-      [controller setValue:value forPreferenceKey:FBKeyboardAutocorrectionKey];
-    }
-  } else if ([key isEqualToString:FBKeyboardPredictionKey]) {
-    // Predictive in Keyboards
-    if ([controller respondsToSelector:@selector(setPredictionEnabled:)]) {
-      controller.predictionEnabled = value;
-    } else {
-      [controller setValue:value forPreferenceKey:FBKeyboardPredictionKey];
-    }
-  }
-
-  [controller synchronizePreferences];
-  dlclose(handle);
-}
 
 + (NSString*)valueFromArguments: (NSArray<NSString *> *)arguments forKey: (NSString*)key
 {

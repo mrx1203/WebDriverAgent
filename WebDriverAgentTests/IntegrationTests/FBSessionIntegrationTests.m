@@ -37,6 +37,9 @@ static NSString *const SETTINGS_BUNDLE_ID = @"com.apple.Preferences";
 - (void)testSettingsAppCanBeOpenedInScopeOfTheCurrentSession
 {
   FBApplication *testedApp = FBApplication.fb_activeApplication;
+  if (!testedApp.fb_isActivateSupported) {
+    return;
+  }
   [self.session launchApplicationWithBundleId:SETTINGS_BUNDLE_ID
                       shouldWaitForQuiescence:nil
                                     arguments:nil
@@ -51,6 +54,9 @@ static NSString *const SETTINGS_BUNDLE_ID = @"com.apple.Preferences";
 - (void)testSettingsAppCanBeReopenedInScopeOfTheCurrentSession
 {
   FBApplication *testedApp = FBApplication.fb_activeApplication;
+  if (!testedApp.fb_isActivateSupported) {
+    return;
+  }
   [self.session launchApplicationWithBundleId:SETTINGS_BUNDLE_ID
                       shouldWaitForQuiescence:nil
                                     arguments:nil
@@ -68,6 +74,9 @@ static NSString *const SETTINGS_BUNDLE_ID = @"com.apple.Preferences";
 - (void)testMainAppCanBeReactivatedInScopeOfTheCurrentSession
 {
   FBApplication *testedApp = FBApplication.fb_activeApplication;
+  if (!testedApp.fb_isActivateSupported) {
+    return;
+  }
   [self.session launchApplicationWithBundleId:SETTINGS_BUNDLE_ID
                       shouldWaitForQuiescence:nil
                                     arguments:nil
@@ -80,6 +89,9 @@ static NSString *const SETTINGS_BUNDLE_ID = @"com.apple.Preferences";
 - (void)testMainAppCanBeRestartedInScopeOfTheCurrentSession
 {
   FBApplication *testedApp = FBApplication.fb_activeApplication;
+  if (!testedApp.fb_isActivateSupported) {
+    return;
+  }
   XCTAssertTrue([self.session terminateApplicationWithBundleId:testedApp.bundleID]);
   XCTAssertEqualObjects(SPRINGBOARD_BUNDLE_ID, self.session.activeApplication.bundleID);
   [self.session launchApplicationWithBundleId:testedApp.bundleID

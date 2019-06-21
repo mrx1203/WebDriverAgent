@@ -30,6 +30,31 @@
 #import "XCUIElementQuery.h"
 #import "XCEventGenerator.h"
 
+/*extern int freqTest(int cycles);
+static double GetCPUFrequency(void)
+{
+  volatile NSTimeInterval times[500];
+  
+  int sum = 0;
+  
+  for(int i = 0; i < 500; i++)
+  {
+    times[i] = [[NSProcessInfo processInfo] systemUptime];
+    sum += freqTest(10000);
+    times[i] = [[NSProcessInfo processInfo] systemUptime] - times[i];
+  }
+  
+  NSTimeInterval time = times[0];
+  for(int i = 1; i < 500; i++)
+  {
+    if(time > times[i])
+      time = times[i];
+  }
+  
+  double freq = 1300000.0 / time;
+  return freq/1000/1000;
+}*/
+
 @implementation FBCustomCommands
 
 + (NSArray *)routes
@@ -55,7 +80,9 @@
     [[FBRoute POST:@"/wda/pressButton"] respondWithTarget:self action:@selector(handlePressButtonCommand:)],
     [[FBRoute POST:@"/wda/siri/activate"] respondWithTarget:self action:@selector(handleActivateSiri:)],
     
-	//用于远程控制的接口
+    //Get CPU Frequency
+    //[[FBRoute GET:@"/wda/cpuFreq"].withoutSession respondWithTarget:self action:@selector(handleGetCpuFreq:)],
+    //用于远程控制的接口
     [[FBRoute POST:@"/wda/swipe_control"].withoutSession respondWithTarget:self action:@selector(handleSwipe_Control:)],
     [[FBRoute POST:@"/wda/click_control"].withoutSession respondWithTarget:self action:@selector(handleClick_Control:)],
   ];
@@ -92,13 +119,7 @@
 
 + (id<FBResponsePayload>)handleDismissKeyboardCommand:(FBRouteRequest *)request
 {
-#if TARGET_OS_TV
-  if ([self isKeyboardPresent]) {
-    [[XCUIRemote sharedRemote] pressButton: XCUIRemoteButtonMenu];
-  }
-#else
   [request.session.activeApplication dismissKeyboard];
-#endif
   NSError *error;
   NSString *errorDescription = @"The keyboard cannot be dismissed. Try to dismiss it in the way supported by your application under test.";
   if ([UIDevice.currentDevice userInterfaceIdiom] == UIUserInterfaceIdiomPhone) {
@@ -109,20 +130,14 @@
      timeout:5]
     timeoutErrorMessage:errorDescription]
    spinUntilTrue:^BOOL{
-     return ![self isKeyboardPresent];
+     XCUIElement *foundKeyboard = [request.session.activeApplication descendantsMatchingType:XCUIElementTypeKeyboard].fb_firstMatch;
+     return !(foundKeyboard && foundKeyboard.fb_isVisible);
    }
    error:&error];
   if (!isKeyboardNotPresent) {
     return FBResponseWithError(error);
   }
   return FBResponseWithOK();
-}
-
-#pragma mark - Helpers
-
-+ (BOOL)isKeyboardPresent {
-  XCUIElement *foundKeyboard = [[FBApplication fb_activeApplication].query descendantsMatchingType:XCUIElementTypeKeyboard].fb_firstMatch;
-  return foundKeyboard && foundKeyboard.fb_isVisible;
 }
 
 + (id<FBResponsePayload>)handleGetScreen:(FBRouteRequest *)request
@@ -181,6 +196,7 @@
   if (nil == content) {
     return FBResponseWithStatus(FBCommandStatusInvalidArgument, @"Cannot decode the pasteboard content from base64");
   }
+  NSLog(@"================handleSetPasteboard content %@",content);
   NSError *error;
   if (![FBPasteboard setData:content forType:contentType error:&error]) {
     return FBResponseWithError(error);
@@ -196,6 +212,7 @@
   if (nil == result) {
     return FBResponseWithError(error);
   }
+  NSLog(@"================handleGetPasteboard content %@",result);
   return FBResponseWithStatus(FBCommandStatusNoError,@{
               @"content":[result base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength],
               @"func":@"getPasteboard"
@@ -232,11 +249,21 @@
   return FBResponseWithOK();
 }
 
+/*+(id<FBResponsePayload>)handleGetCpuFreq:(FBRouteRequest *)request
+{
+  NSString *freq =[NSString stringWithFormat:@"%.2f",GetCPUFrequency()];
+  //NSLog(@"===================%@",freq);
+  
+  return FBResponseWithStatus(FBCommandStatusNoError,@{
+      @"CPUFREQ":freq
+    });
+}*/
+
 + (id<FBResponsePayload>)handleClick_Control:(FBRouteRequest *)request
 {
   CGPoint tapPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
   double duration = [request.arguments[@"duration"] doubleValue];
-  //NSLog(@"x=%@ y=%@ duration=%@",request.arguments[@"x"],request.arguments[@"y"],request.arguments[@"duration"]);
+  NSLog(@"x=%@ y=%@ duration=%@",request.arguments[@"x"],request.arguments[@"y"],request.arguments[@"duration"]);
   //[[XCEventGenerator sharedGenerator] pressAtPoint:tapPoint forDuration:duration liftAtPoint:tapPoint velocity:500 orientation:0 name:@"tap" handler:*(XCSynthesizedEventRecord *record,NSError *error){}];
   [[XCEventGenerator sharedGenerator] pressAtPoint:tapPoint forDuration:duration orientation:0 handler:^(XCSynthesizedEventRecord *record, NSError *error) {} ];
   return FBResponseWithOK();
@@ -248,6 +275,8 @@
   CGPoint endPoint = CGPointMake((CGFloat)[request.arguments[@"toX"] doubleValue], (CGFloat)[request.arguments[@"toY"] doubleValue]);
   NSTimeInterval duration = [request.arguments[@"duration"] doubleValue];
   
+  NSLog(@"fromX=%@ fromY=%@ toX=%@ toY=%@ duration=%@",request.arguments[@"fromX"],request.arguments[@"fromY"],
+        request.arguments[@"toX"],request.arguments[@"toY"],request.arguments[@"duration"]);
   [[XCEventGenerator sharedGenerator] pressAtPoint:startPoint forDuration:duration liftAtPoint:endPoint velocity:500 orientation:0 name:@"drag" handler:^(XCSynthesizedEventRecord *record,NSError *error){}];
   return FBResponseWithOK();
 }

@@ -191,17 +191,6 @@ static NSMutableDictionary<NSNumber *, NSMutableDictionary<NSString *, NSMutable
   return [[self fb_cachedValueWithAttributeName:@"isWDVisible" valueGetter:getter] boolValue];
 }
 
-#if TARGET_OS_TV
-- (BOOL)isWDFocused
-{
-  id (^getter)(void) = ^id(void) {
-    return @(self.hasFocus);
-  };
-
-  return [[self fb_cachedValueWithAttributeName:@"hasFocus" valueGetter:getter] boolValue];
-}
-#endif
-
 - (BOOL)isWDAccessible
 {
   id (^getter)(void) = ^id(void) {

@@ -20,7 +20,6 @@
 #import "XCUIElement.h"
 #import "XCUIElementQuery.h"
 #import "FBXCAXClientProxy.h"
-#import "XCUIApplicationProcessQuiescence.h"
 
 @interface FBApplication ()
 @property (nonatomic, assign) BOOL fb_isObservingAppImplCurrentProcess;
@@ -42,6 +41,11 @@
   }
   FBApplication *application = [FBApplication fb_applicationWithPID:activeApplicationElement.processIdentifier];
   NSAssert(nil != application, @"Active application instance is not expected to be equal to nil", nil);
+  if (!application.fb_isActivateSupported) {
+    // This is needed for Xcode8 compatibility
+    [application query];
+    [application resolve];
+  }
   return application;
 }
 
@@ -85,7 +89,10 @@
 
 - (void)launch
 {
-  [XCUIApplicationProcessQuiescence setQuiescenceCheck:self.fb_shouldWaitForQuiescence];
+  if (!self.fb_shouldWaitForQuiescence && ![FBXCAXClientProxy.sharedClient hasProcessTracker]) {
+    [self.fb_appImpl addObserver:self forKeyPath:FBStringify(XCUIApplicationImpl, currentProcess) options:(NSKeyValueObservingOptions)(NSKeyValueObservingOptionInitial | NSKeyValueObservingOptionNew) context:nil];
+    self.fb_isObservingAppImplCurrentProcess = YES;
+  }
   [super launch];
   [FBApplication fb_registerApplication:self withProcessID:self.processID];
 }

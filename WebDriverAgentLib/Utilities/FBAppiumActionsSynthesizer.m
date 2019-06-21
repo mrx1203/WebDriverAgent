@@ -43,7 +43,6 @@ static const double FB_LONG_TAP_DURATION_MS = 600.0;
 static NSString *const FB_OPTIONS_KEY = @"options";
 static NSString *const FB_ELEMENT_KEY = @"element";
 
-#if !TARGET_OS_TV
 @interface FBAppiumGestureItem : FBBaseGestureItem
 
 @end
@@ -490,4 +489,3 @@ static NSString *const FB_ELEMENT_KEY = @"element";
 
 @end
 
-#endif

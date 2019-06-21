@@ -39,14 +39,14 @@ static bool fb_isLocked;
 + (void)fb_registerAppforDetectLockState
 {
   int notify_token;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wstrict-prototypes"
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wstrict-prototypes"
   notify_register_dispatch("com.apple.springboard.lockstate", &notify_token, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^(int token) {
     uint64_t state = UINT64_MAX;
     notify_get_state(token, &state);
     fb_isLocked = state != 0;
   });
-#pragma clang diagnostic pop
+  #pragma clang diagnostic pop
 }
 
 - (BOOL)fb_goToHomescreenWithError:(NSError **)error
@@ -57,10 +57,10 @@ static bool fb_isLocked;
   // So if we don't wait here it will be interpreted as double home button gesture and go to application switcher instead.
   // On 9.3 pressButton:XCUIDeviceButtonHome can be slightly delayed.
   // Causing waitUntilApplicationBoardIsVisible not to work properly in some edge cases e.g. like starting session right after this call, while being on home screen
-  [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:FBHomeButtonCoolOffTime]];
+  /*[[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:FBHomeButtonCoolOffTime]];
   if (![[FBSpringboardApplication fb_springboard] fb_waitUntilApplicationBoardIsVisible:error]) {
     return NO;
-  }
+  }*/
   return YES;
 }
 
@@ -70,12 +70,13 @@ static bool fb_isLocked;
     return YES;
   }
   [self pressLockButton];
-  return [[[[FBRunLoopSpinner new]
+  return YES;
+ /* return [[[[FBRunLoopSpinner new]
             timeout:FBScreenLockTimeout]
            timeoutErrorMessage:@"Timed out while waiting until the screen gets locked"]
           spinUntilTrue:^BOOL{
             return fb_isLocked;
-          } error:error];
+          } error:error];*/
 }
 
 - (BOOL)fb_isScreenLocked
@@ -89,23 +90,20 @@ static bool fb_isLocked;
     return YES;
   }
   [self pressButton:XCUIDeviceButtonHome];
-  [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:FBHomeButtonCoolOffTime]];
-#if !TARGET_OS_TV
+  //[[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:FBHomeButtonCoolOffTime]];
   if (SYSTEM_VERSION_LESS_THAN(@"10.0")) {
     [[FBApplication fb_activeApplication] swipeRight];
   } else {
     [self pressButton:XCUIDeviceButtonHome];
   }
-#else
-  [self pressButton:XCUIDeviceButtonHome];
-#endif
-  [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:FBHomeButtonCoolOffTime]];
-  return [[[[FBRunLoopSpinner new]
+  return YES;
+  //[[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:FBHomeButtonCoolOffTime]];
+  /*return [[[[FBRunLoopSpinner new]
             timeout:FBScreenLockTimeout]
            timeoutErrorMessage:@"Timed out while waiting until the screen gets unlocked"]
           spinUntilTrue:^BOOL{
             return !fb_isLocked;
-          } error:error];
+          } error:error];*/
 }
 
 - (NSData *)fb_screenshotWithError:(NSError*__autoreleasing*)error
@@ -114,11 +112,7 @@ static bool fb_isLocked;
   if (nil == screenshotData) {
     return nil;
   }
-#if TARGET_OS_TV
-  return FBAdjustScreenshotOrientationForApplication(screenshotData);
-#else
   return FBAdjustScreenshotOrientationForApplication(screenshotData, FBApplication.fb_activeApplication.interfaceOrientation);
-#endif
 }
 
 - (NSData *)fb_rawScreenshotWithQuality:(NSUInteger)quality rect:(CGRect)rect error:(NSError*__autoreleasing*)error
@@ -174,7 +168,7 @@ static bool fb_isLocked;
              withDescriptionFormat:@"'%@' is not a valid URL", url]
             buildError:error];
   }
-
+  
   id siriService = [self valueForKey:@"siriService"];
   if (nil != siriService) {
     return [self fb_activateSiriVoiceRecognitionWithText:[NSString stringWithFormat:@"Open {%@}", url] error:error];
@@ -213,70 +207,6 @@ static bool fb_isLocked;
   }
 }
 
-#if TARGET_OS_TV
-- (BOOL)fb_pressButton:(NSString *)buttonName error:(NSError **)error
-{
-  NSMutableArray<NSString *> *supportedButtonNames = [NSMutableArray array];
-  NSInteger remoteButton = -1; // no remote button
-  if ([buttonName.lowercaseString isEqualToString:@"home"]) {
-    //  XCUIRemoteButtonHome        = 7
-    remoteButton = XCUIRemoteButtonHome;
-  }
-  [supportedButtonNames addObject:@"home"];
-
-  // https://developer.apple.com/design/human-interface-guidelines/tvos/remote-and-controllers/remote/
-  if ([buttonName.lowercaseString isEqualToString:@"up"]) {
-    //  XCUIRemoteButtonUp          = 0,
-    remoteButton = XCUIRemoteButtonUp;
-  }
-  [supportedButtonNames addObject:@"up"];
-
-  if ([buttonName.lowercaseString isEqualToString:@"down"]) {
-    //  XCUIRemoteButtonDown        = 1,
-    remoteButton = XCUIRemoteButtonDown;
-  }
-  [supportedButtonNames addObject:@"down"];
-
-  if ([buttonName.lowercaseString isEqualToString:@"left"]) {
-    //  XCUIRemoteButtonLeft        = 2,
-    remoteButton = XCUIRemoteButtonLeft;
-  }
-  [supportedButtonNames addObject:@"left"];
-
-  if ([buttonName.lowercaseString isEqualToString:@"right"]) {
-    //  XCUIRemoteButtonRight       = 3,
-    remoteButton = XCUIRemoteButtonRight;
-  }
-  [supportedButtonNames addObject:@"right"];
-
-  if ([buttonName.lowercaseString isEqualToString:@"menu"]) {
-    //  XCUIRemoteButtonMenu        = 5,
-    remoteButton = XCUIRemoteButtonMenu;
-  }
-  [supportedButtonNames addObject:@"menu"];
-
-  if ([buttonName.lowercaseString isEqualToString:@"playpause"]) {
-    //  XCUIRemoteButtonPlayPause   = 6,
-    remoteButton = XCUIRemoteButtonPlayPause;
-  }
-  [supportedButtonNames addObject:@"playpause"];
-
-  if ([buttonName.lowercaseString isEqualToString:@"select"]) {
-    //  XCUIRemoteButtonSelect      = 4,
-    remoteButton = XCUIRemoteButtonSelect;
-  }
-  [supportedButtonNames addObject:@"select"];
-
-  if (remoteButton == -1) {
-    return [[[FBErrorBuilder builder]
-             withDescriptionFormat:@"The button '%@' is unknown. Only the following button names are supported: %@", buttonName, supportedButtonNames]
-            buildError:error];
-  }
-  [[XCUIRemote sharedRemote] pressButton:remoteButton];
-  return YES;
-}
-#else
-
 - (BOOL)fb_pressButton:(NSString *)buttonName error:(NSError **)error
 {
   NSMutableArray<NSString *> *supportedButtonNames = [NSMutableArray array];
@@ -295,7 +225,6 @@ static bool fb_isLocked;
   [supportedButtonNames addObject:@"volumeUp"];
   [supportedButtonNames addObject:@"volumeDown"];
 #endif
-
   if (dstButton == 0) {
     return [[[FBErrorBuilder builder]
              withDescriptionFormat:@"The button '%@' is unknown. Only the following button names are supported: %@", buttonName, supportedButtonNames]
@@ -304,6 +233,5 @@ static bool fb_isLocked;
   [self pressButton:dstButton];
   return YES;
 }
-#endif
 
 @end

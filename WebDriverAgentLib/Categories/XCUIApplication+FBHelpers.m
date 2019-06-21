@@ -28,12 +28,16 @@ const static NSTimeInterval FBMinimumAppSwitchWait = 3.0;
 
 - (BOOL)fb_deactivateWithDuration:(NSTimeInterval)duration error:(NSError **)error
 {
+  NSString *applicationIdentifier = self.label;
   if(![[XCUIDevice sharedDevice] fb_goToHomescreenWithError:error]) {
     return NO;
   }
   [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:MAX(duration, FBMinimumAppSwitchWait)]];
-  [self fb_activate];
-  return YES;
+  if (self.fb_isActivateSupported) {
+    [self fb_activate];
+    return YES;
+  }
+  return [[FBSpringboardApplication fb_springboard] fb_tapApplicationWithIdentifier:applicationIdentifier error:error];
 }
 
 - (NSDictionary *)fb_tree
@@ -84,12 +88,9 @@ const static NSTimeInterval FBMinimumAppSwitchWait = 3.0;
   // exceptions like https://github.com/facebook/WebDriverAgent/issues/639#issuecomment-314421206
   // caused by broken element dimensions returned by XCTest
   info[@"rect"] = FBwdRectNoInf(snapshot.wdRect);
-  info[@"frame"] = NSStringFromCGRect(snapshot.wdFrame);
+  info[@"bounds"] = @[info[@"rect"][@"x"],info[@"rect"][@"y"],info[@"rect"][@"width"],info[@"rect"][@"height"]];//NSStringFromCGRect(snapshot.wdFrame);
   info[@"isEnabled"] = [@([snapshot isWDEnabled]) stringValue];
   info[@"isVisible"] = [@([snapshot isWDVisible]) stringValue];
-#if TARGET_OS_TV
-  info[@"isFocused"] = [@([snapshot isWDFocused]) stringValue];
-#endif
 
   if (!recursive) {
     return info.copy;
@@ -162,14 +163,5 @@ const static NSTimeInterval FBMinimumAppSwitchWait = 3.0;
            matchingPredicate:[NSPredicate predicateWithFormat:@"hasKeyboardFocus == YES"]]
           fb_firstMatch];
 }
-
-#if TARGET_OS_TV
-- (XCUIElement *)fb_focusedElement
-{
-  return [[[self descendantsMatchingType:XCUIElementTypeAny]
-           matchingPredicate:[NSPredicate predicateWithFormat:@"hasFocus == true"]]
-          fb_firstMatch];
-}
-#endif
 
 @end

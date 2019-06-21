@@ -13,6 +13,7 @@
 
 #import "XCUIElement.h"
 #import "XCUIApplication+FBTouchAction.h"
+#import "FBAlert.h"
 #import "FBTestMacros.h"
 #import "XCUIDevice+FBRotation.h"
 #import "FBRunLoopSpinner.h"
@@ -32,6 +33,7 @@
 {
   [[XCUIDevice sharedDevice] fb_setDeviceInterfaceOrientation:orientation];
   NSError *error;
+  XCTAssertTrue(self.testedApplication.alerts.count == 0);
   XCTAssertTrue([self.testedApplication fb_performW3CTouchActions:gesture elementCache:nil error:&error]);
   FBAssertWaitTillBecomesTrue(self.testedApplication.alerts.count > 0);
 }
@@ -44,14 +46,12 @@
     [self launchApplication];
     [self goToAlertsPage];
   });
-  [self clearAlert];
 }
 
 - (void)tearDown
 {
-  [self clearAlert];
-  [self resetOrientation];
   [super tearDown];
+  [[FBAlert alertWithApplication:self.testedApplication] dismissWithError:nil];
 }
 
 - (void)testErroneousGestures
@@ -363,7 +363,6 @@
 
 - (void)tearDown
 {
-  [self resetOrientation];
   [super tearDown];
 }
 
@@ -377,7 +376,7 @@
                    timeout:2.0]
                   timeoutErrorMessage:@"Picker wheel value has not been changed after 2 seconds timeout"]
                  spinUntilTrue:^BOOL{
-                   [self.pickerWheel fb_nativeResolve];
+                   [self.pickerWheel resolve];
                    return ![self.pickerWheel.value isEqualToString:previousValue];
                  }
                  error:&error]);
