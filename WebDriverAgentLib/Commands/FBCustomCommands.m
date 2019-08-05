@@ -166,7 +166,10 @@ static double GetCPUFrequency(void)
 + (id<FBResponsePayload>)handleIsLocked:(FBRouteRequest *)request
 {
   BOOL isLocked = [XCUIDevice sharedDevice].fb_isScreenLocked;
-  return FBResponseWithStatus(FBCommandStatusNoError, isLocked ? @YES : @NO);
+  return FBResponseWithStatus(FBCommandStatusNoError, @{
+      @"isLocked":isLocked ? @YES : @NO,
+      @"func":@"locked"
+  });
 }
 
 + (id<FBResponsePayload>)handleUnlock:(FBRouteRequest *)request

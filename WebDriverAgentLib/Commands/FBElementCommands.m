@@ -81,10 +81,8 @@
     [[FBRoute POST:@"/wda/keys"] respondWithTarget:self action:@selector(handleKeys:)],
     [[FBRoute POST:@"/wda/pickerwheel/:uuid/select"] respondWithTarget:self action:@selector(handleWheelSelect:)],
     [[FBRoute POST:@"/wda/element/:uuid/forceTouch"] respondWithTarget:self action:@selector(handleForceTouch:)],
-    
-    //用于远程控制的接口
-    //[[FBRoute POST:@"/wda/swipe_control"] respondWithTarget:self action:@selector(handleSwipe_Control:)],
-    //[[FBRoute POST:@"/wda/click_control"] respondWithTarget:self action:@selector(handleClick_Control:)],
+    //删除一个字符，用于处理del事件
+    [[FBRoute POST:@"/wda/del_key"].withoutSession respondWithTarget:self action:@selector(handleDeleteKey:)],
   ];
 }
 
@@ -400,8 +398,20 @@
   NSString *textToType = request.arguments[@"value"];//[request.arguments[@"value"] componentsJoinedByString:@""];
   NSUInteger frequency = [request.arguments[@"frequency"] unsignedIntegerValue] ?: [FBConfiguration maxTypingFrequency];
   NSError *error;
-  //NSLog(@"========== value=%@   freq=%d",textToType,frequency);
   if (![FBKeyboard typeText:textToType frequency:frequency error:&error]) {
+    return FBResponseWithError(error);
+  }
+  return FBResponseWithOK();
+}
+
++ (id<FBResponsePayload>)handleDeleteKey:(FBRouteRequest *)request
+{
+  NSError * error ;
+  NSData *encodedSequence = [@"\\u0008\\u007F" dataUsingEncoding:NSASCIIStringEncoding];
+  NSString *backspaceDeleteSequence = [[NSString alloc] initWithData:encodedSequence encoding:NSNonLossyASCIIStringEncoding];
+  NSMutableString *textToType = @"".mutableCopy;
+  [textToType appendString:backspaceDeleteSequence];
+  if (textToType.length > 0 && ![FBKeyboard typeText:textToType error:&error]) {
     return FBResponseWithError(error);
   }
   return FBResponseWithOK();
