@@ -23,9 +23,10 @@
 {
   return
   @[
-    [[FBRoute POST:@"/wda/touch/perform"].withoutSession respondWithTarget:self action:@selector(handlePerformAppiumTouchActions:)],
+    [[FBRoute POST:@"/wda/touch/perform"] respondWithTarget:self action:@selector(handlePerformAppiumTouchActions:)],
     [[FBRoute POST:@"/wda/touch/multi/perform"] respondWithTarget:self action:@selector(handlePerformAppiumTouchActions:)],
     [[FBRoute POST:@"/actions"] respondWithTarget:self action:@selector(handlePerformW3CTouchActions:)],
+    [[FBRoute POST:@"/wda/touch/perform_stf"].withoutSession respondWithTarget:self action:@selector(handlePerformAppiumTouchActions:)],
   ];
 }
 

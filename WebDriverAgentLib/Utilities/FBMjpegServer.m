@@ -20,7 +20,9 @@
 #import "FBXCTestDaemonsProxy.h"
 #import "XCUIScreen.h"
 #import "FBImageIOScaler.h"
+#import "FBImageUtils.h"
 #import "XCAXClient_iOS.h"
+#import "FBMacros.h"
 
 static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.1;
 static const NSUInteger MAX_FPS = 60;
@@ -100,22 +102,40 @@ static long count = 0;
 
   // If scaling is applied we perform another JPEG compression after scaling
   // To get the desired compressionQuality we need to do a lossless compression here
-  if (usesScaling) {
-    compressionQuality = FBMaxScalingFactor;
-  }
+  //if (usesScaling) {
+  //  compressionQuality = FBMaxScalingFactor;
+  //}
+  CGFloat screenshotCompressionQuality = usesScaling ? FBMaxCompressionQuality : compressionQuality;
+  //NSLog(@"===================screenshotCompressionQuality is %f",screenshotCompressionQuality);
   id<XCTestManager_ManagerInterface> proxy = [FBXCTestDaemonsProxy testRunnerProxy];
   dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-  [proxy _XCT_requestScreenshotOfScreenWithID:[[XCUIScreen mainScreen] displayID]
-                                       withRect:CGRectNull
-                                            uti:(__bridge id)kUTTypeJPEG
-                             compressionQuality:compressionQuality
-                                      withReply:^(NSData *data, NSError *error) {
-    if (error != nil) {
-      [FBLogger logFmt:@"Error taking screenshot: %@", [error description]];
+  if (SYSTEM_VERSION_LESS_THAN(@"11.0")){
+    //double start = [[NSDate date] timeIntervalSince1970];
+    id xcScreen = NSClassFromString((@"XCUIScreen"));
+    if(xcScreen){
+      screenshotData = [xcScreen valueForKeyPath:@"mainScreen.screenshot.PNGRepresentation"];
     }
-    screenshotData = data;
+    else{
+      screenshotData = [[XCAXClient_iOS sharedClient] screenshotData];
+    }
+    screenshotData = UIImageJPEGRepresentation([UIImage imageWithData:screenshotData], 0.1);
+    //double end = [[NSDate date] timeIntervalSince1970];
+    //NSLog(@"===================%f",end-start);
     dispatch_semaphore_signal(sem);
-  }];
+  }
+  else{
+    [proxy _XCT_requestScreenshotOfScreenWithID:[[XCUIScreen mainScreen] displayID]
+                                         withRect:CGRectNull
+                                              uti:(__bridge id)kUTTypeJPEG
+                               compressionQuality:screenshotCompressionQuality//compressionQuality//
+                                        withReply:^(NSData *data, NSError *error) {
+      if (error != nil) {
+        [FBLogger logFmt:@"Error taking screenshot: %@", [error description]];
+      }
+      screenshotData = data;
+      dispatch_semaphore_signal(sem);
+    }];
+  }
   dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SCREENSHOT_TIMEOUT * NSEC_PER_SEC)));
   if (nil == screenshotData) {
     [self scheduleNextScreenshotWithInterval:timerInterval timeStarted:timeStarted];
@@ -138,9 +158,9 @@ static long count = 0;
 
 - (void)sendScreenshot:(NSData *)screenshotData {
   //NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString\r\nContent-type: image/jpg\r\nContent-Length: %@\r\n\r\n", @(screenshotData.length)];
-  UIInterfaceOrientation orientation = UIDeviceOrientationPortrait;
+  UIInterfaceOrientation orientation = UIInterfaceOrientationPortrait;
   @try {
-    FBApplication *systemApp = FBApplication.fb_systemApplication;
+    FBApplication *systemApp = FBApplication.fb_activeApplication;
     orientation = systemApp.interfaceOrientation;
   }@catch(NSException *e) {
     NSLog(@"%@",e);
@@ -148,6 +168,7 @@ static long count = 0;
   
   NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString--Content-type: image/jpg--=%d=",orientation];
   NSMutableData *chunk = [[chunkHeader dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
+  //[chunk appendData:(id)[[NSString stringWithFormat:@"%ld",orientation] dataUsingEncoding:NSUTF8StringEncoding]];
   [chunk appendData:screenshotData];
   count+=1;
   double losttime = [[NSDate date] timeIntervalSince1970]-self.startTime;
@@ -172,7 +193,16 @@ static long count = 0;
   dispatch_once(&onceCanStream, ^{
     result = [(NSObject *)[FBXCTestDaemonsProxy testRunnerProxy] respondsToSelector:@selector(_XCT_requestScreenshotOfScreenWithID:withRect:uti:compressionQuality:withReply:)];
   });
-  return YES;
+  if(!result){
+    id xcScreen = NSClassFromString((@"XCUIScreen"));
+    if(xcScreen){
+      result = [xcScreen valueForKeyPath:@"mainScreen.screenshot.PNGRepresentation"];
+    }
+    else{
+      result = [[XCAXClient_iOS sharedClient] screenshotData];
+    }
+  }
+  return result;
 }
 
 - (void)didClientConnect:(GCDAsyncSocket *)newClient activeClients:(NSArray<GCDAsyncSocket *> *)activeClients
