@@ -34,11 +34,11 @@
 
 + (id<FBResponsePayload>)handlePerformAppiumTouchActions:(FBRouteRequest *)request
 {
-  XCUIApplication *application = [FBApplication fb_activeApplication];
+  XCUIApplication *application = [FBApplication fb_activeApplication];//request.session.activeApplication;
   NSArray *actions = (NSArray *)request.arguments[@"actions"];
   NSError *error;
-  if (![application fb_performAppiumTouchActions:actions elementCache:nil error:&error]) {
-    return FBResponseWithError(error);
+  if (![application fb_performAppiumTouchActions:actions elementCache:request.session.elementCache error:&error]) {
+    return FBResponseWithUnknownError(error);
   }
   return FBResponseWithOK();
 }
@@ -49,7 +49,7 @@
   NSArray *actions = (NSArray *)request.arguments[@"actions"];
   NSError *error;
   if (![application fb_performW3CTouchActions:actions elementCache:request.session.elementCache error:&error]) {
-    return FBResponseWithError(error);
+    return FBResponseWithUnknownError(error);
   }
   return FBResponseWithOK();
 }

@@ -21,6 +21,8 @@
     NSOrderedSet *_lastInput;
     NSOrderedSet *_lastOutput;
     XCElementSnapshot *_rootElementSnapshot;
+    // Added since Xcode 11.0 (beta)
+    BOOL _modalViewPruningDisabled;
 }
 
 @property(copy) NSOrderedSet *lastOutput; // @synthesize lastOutput=_lastOutput;
@@ -29,6 +31,8 @@
 @property unsigned long long expressedType; // @synthesize expressedType=_expressedType;
 @property BOOL changesScope; // @synthesize changesScope=_changesScope;
 @property(readonly, copy) CDUnknownBlockType filter; // @synthesize filter=_filter;
+// Added since Xcode 11.0 (beta)
+@property BOOL modalViewPruningDisabled; // @synthesize modalViewPruningDisabled=_modalViewPruningDisabled;
 @property(readonly) XCUIElementQuery *inputQuery; // @synthesize inputQuery=_inputQuery;
 @property(readonly, copy) NSString *queryDescription; // @synthesize queryDescription=_queryDescription;
 @property(readonly, copy) NSString *elementDescription;
@@ -36,10 +40,14 @@
 @property(retain) XCElementSnapshot *rootElementSnapshot; // @synthesize rootElementSnapshot=_rootElementSnapshot;
 @property(retain) NSObject<XCTElementSetTransformer> *transformer; // @synthesize transformer = _transformer;
 
+// Added since Xcode 11.0 (beta)
+@property(readonly, copy) XCUIElementQuery *excludingNonModalElements;
+// Added since Xcode 11.0 (GM)
+@property(readonly, copy) XCUIElementQuery *includingNonModalElements;
+
 - (id)matchingSnapshotsWithError:(id *)arg1;
 - (id)matchingSnapshotsHandleUIInterruption:(BOOL)arg1 withError:(id *)arg2;
 - (id)_elementMatchingAccessibilityElementOfSnapshot:(id)arg1;
-- (XCElementSnapshot *)elementSnapshotForDebugDescription;
 - (id)_containingPredicate:(id)arg1 queryDescription:(id)arg2;
 - (id)_predicateWithType:(unsigned long long)arg1 identifier:(id)arg2;
 - (id)_queryWithPredicate:(id)arg1;
@@ -51,6 +59,11 @@
 - (id)_derivedExpressedIdentifiers;
 - (unsigned long long)_derivedExpressedType;
 - (id)initWithInputQuery:(id)arg1 queryDescription:(id)arg2 filter:(CDUnknownBlockType)arg3;
+
+// Deprecated since Xcode 11.0
+- (XCElementSnapshot *)elementSnapshotForDebugDescription;
+// Added since Xcode 11.0
+- (XCElementSnapshot *)elementSnapshotForDebugDescriptionWithNoMatchesMessage:(id *)arg1;
 
 /*! DO NOT USE DIRECTLY! Please use fb_firstMatch instead */
 - (XCUIElement *)firstMatch;

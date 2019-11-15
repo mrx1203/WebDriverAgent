@@ -35,16 +35,6 @@
   XCTAssertTrue([FBSpringboardApplication fb_springboard].icons[@"Calendar"].exists);
 }
 
-- (void)disabled_testTappingAppOnSpringboard
-{
-  // this test is flaky on CircleCI
-  [self goToSpringBoardFirstPage];
-  NSError *error;
-  XCTAssertTrue([[FBSpringboardApplication fb_springboard] fb_tapApplicationWithIdentifier:@"Safari" error:&error]);
-  XCTAssertNil(error);
-  XCTAssertTrue([FBApplication fb_activeApplication].buttons[@"URL"].exists);
-}
-
 - (void)disabled_testWaitingForSpringboard
 {
   // This test is flaky on Travis
@@ -76,7 +66,8 @@
 {
   XCTAssertTrue([FBApplication fb_activeApplication].buttons[@"Alerts"].fb_isVisible);
   [self goToSpringBoardFirstPage];
-  XCTAssertTrue([FBApplication fb_activeApplication].icons[@"Safari"].fb_isVisible);
+  XCTAssertEqualObjects([FBApplication fb_activeApplication].bundleID, SPRINGBOARD_BUNDLE_ID);
+  XCTAssertTrue([FBApplication fb_activeApplicationWithDefaultBundleId:SPRINGBOARD_BUNDLE_ID].icons[@"Safari"].fb_isVisible);
 }
 
 - (void)testActiveElement
@@ -88,6 +79,20 @@
   FBAssertWaitTillBecomesTrue(nil != self.testedApplication.fb_activeElement);
   XCTAssertEqualObjects(((id<FBElement>)self.testedApplication.fb_activeElement).wdUID,
                         ((id<FBElement>)textField).wdUID);
+}
+
+- (void)testActiveApplicationsInfo
+{
+  NSArray *appsInfo = [XCUIApplication fb_activeAppsInfo];
+  XCTAssertTrue(appsInfo.count > 0);
+  BOOL isAppActive = NO;
+  for (NSDictionary *appInfo in appsInfo) {
+    if ([appInfo[@"bundleId"] isEqualToString:self.testedApplication.bundleID]) {
+      isAppActive = YES;
+      break;
+    }
+  }
+  XCTAssertTrue(isAppActive);
 }
 
 @end

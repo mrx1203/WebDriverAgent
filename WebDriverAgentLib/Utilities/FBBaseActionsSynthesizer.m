@@ -22,7 +22,7 @@
 #import "XCSynthesizedEventRecord.h"
 #import "XCUIElement+FBUtilities.h"
 
-
+#if !TARGET_OS_TV
 @implementation FBBaseGestureItem
 
 + (NSString *)actionName
@@ -41,18 +41,25 @@
 {
   UIInterfaceOrientation interfaceOrientation = self.application.interfaceOrientation;
   if (interfaceOrientation == UIInterfaceOrientationPortrait) {
+    // There is no need to recalculate anything for portrait orientation
     return hitPoint;
+  }
+  CGRect appFrame = self.application.frame;
+  if (@available(iOS 13.0, *)) {
+    // For Xcode11 it is always necessary to adjust the tap point coordinates
+    return FBInvertPointForApplication(hitPoint, appFrame.size, interfaceOrientation);
   }
   NSArray<XCElementSnapshot *> *ancestors = snapshot.fb_ancestors;
   XCElementSnapshot *parentWindow = ancestors.count > 1 ? [ancestors objectAtIndex:ancestors.count - 2] : nil;
   CGRect parentWindowFrame = nil == parentWindow ? snapshot.frame : parentWindow.frame;
-  CGRect appFrame = self.application.frame;
   if ((appFrame.size.height > appFrame.size.width && parentWindowFrame.size.height < parentWindowFrame.size.width) ||
       (appFrame.size.height < appFrame.size.width && parentWindowFrame.size.height > parentWindowFrame.size.width)) {
-    // This is the indication of the fact that transformation is broken and coordinates should be
-    // recalculated manually.
-    // However, upside-down case cannot be covered this way, which is not important for Appium
-    hitPoint = FBInvertPointForApplication(hitPoint, appFrame.size, interfaceOrientation);
+    /*
+     This is the indication of the fact that transformation is broken and coordinates should be
+     recalculated manually.
+     However, upside-down case cannot be covered this way, which is not important for Appium
+     */
+    return FBInvertPointForApplication(hitPoint, appFrame.size, interfaceOrientation);
   }
   return hitPoint;
 }
@@ -62,6 +69,7 @@
   CGPoint hitPoint;
   if (nil == element) {
     // Only absolute offset is defined
+    
     hitPoint = [positionOffset CGPointValue];
     if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"10.0")) {
       /*
@@ -73,8 +81,18 @@
     }
   } else {
     // The offset relative to the element is defined
+
     XCElementSnapshot *snapshot = element.fb_lastSnapshot;
-    CGRect frame = snapshot.frame;
+    if (nil == positionOffset) {
+      NSValue *hitPointValue = snapshot.fb_hitPoint;
+      if (nil != hitPointValue) {
+        // short circuit element hitpoint
+        return hitPointValue;
+      }
+      [FBLogger logFmt:@"Will use the frame of '%@' for hit point calculation instead", element.debugDescription];
+    }
+    CGRect visibleFrame = snapshot.visibleFrame;
+    CGRect frame = CGRectIsEmpty(visibleFrame) ? element.frame : visibleFrame;
     if (CGRectIsEmpty(frame)) {
       [FBLogger log:self.application.fb_descriptionRepresentation];
       NSString *description = [NSString stringWithFormat:@"The element '%@' is not visible on the screen and thus is not interactable", element.description];
@@ -83,16 +101,6 @@
       }
       return nil;
     }
-    if (nil == positionOffset) {
-      NSValue *hitPointValue = snapshot.fb_hitPoint;
-      if (nil != hitPointValue) {
-        // short circuit element hitpoint
-        return hitPointValue;
-      }
-      [FBLogger logFmt:@"Failed to fetch hit point for %@. Will use element frame for hit point calculation instead", element.debugDescription];
-    }
-    CGRect visibleFrame = snapshot.visibleFrame;
-    frame = CGRectIsEmpty(visibleFrame) ? frame : visibleFrame;
     if (nil == positionOffset) {
       hitPoint = CGPointMake(frame.origin.x + frame.size.width / 2,
                              frame.origin.y + frame.size.height / 2);
@@ -185,3 +193,4 @@
 }
 
 @end
+#endif

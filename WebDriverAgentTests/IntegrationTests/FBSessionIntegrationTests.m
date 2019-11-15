@@ -16,6 +16,13 @@
 #import "FBSpringboardApplication.h"
 #import "FBXCodeCompatibility.h"
 #import "FBTestMacros.h"
+#import "FBUnattachedAppLauncher.h"
+
+@interface FBSession (Tests)
+
+@property (nonatomic) NSDictionary<NSString *, FBApplication *> *applications;
+
+@end
 
 @interface FBSessionIntegrationTests : FBIntegrationTestCase
 @property (nonatomic) FBSession *session;
@@ -30,16 +37,12 @@ static NSString *const SETTINGS_BUNDLE_ID = @"com.apple.Preferences";
 {
   [super setUp];
   [self launchApplication];
-
-  self.session = [FBSession sessionWithApplication:FBApplication.fb_activeApplication];
+  self.session = [FBSession initWithApplication:FBApplication.fb_activeApplication];
 }
 
 - (void)testSettingsAppCanBeOpenedInScopeOfTheCurrentSession
 {
   FBApplication *testedApp = FBApplication.fb_activeApplication;
-  if (!testedApp.fb_isActivateSupported) {
-    return;
-  }
   [self.session launchApplicationWithBundleId:SETTINGS_BUNDLE_ID
                       shouldWaitForQuiescence:nil
                                     arguments:nil
@@ -53,10 +56,6 @@ static NSString *const SETTINGS_BUNDLE_ID = @"com.apple.Preferences";
 
 - (void)testSettingsAppCanBeReopenedInScopeOfTheCurrentSession
 {
-  FBApplication *testedApp = FBApplication.fb_activeApplication;
-  if (!testedApp.fb_isActivateSupported) {
-    return;
-  }
   [self.session launchApplicationWithBundleId:SETTINGS_BUNDLE_ID
                       shouldWaitForQuiescence:nil
                                     arguments:nil
@@ -74,9 +73,6 @@ static NSString *const SETTINGS_BUNDLE_ID = @"com.apple.Preferences";
 - (void)testMainAppCanBeReactivatedInScopeOfTheCurrentSession
 {
   FBApplication *testedApp = FBApplication.fb_activeApplication;
-  if (!testedApp.fb_isActivateSupported) {
-    return;
-  }
   [self.session launchApplicationWithBundleId:SETTINGS_BUNDLE_ID
                       shouldWaitForQuiescence:nil
                                     arguments:nil
@@ -89,9 +85,6 @@ static NSString *const SETTINGS_BUNDLE_ID = @"com.apple.Preferences";
 - (void)testMainAppCanBeRestartedInScopeOfTheCurrentSession
 {
   FBApplication *testedApp = FBApplication.fb_activeApplication;
-  if (!testedApp.fb_isActivateSupported) {
-    return;
-  }
   XCTAssertTrue([self.session terminateApplicationWithBundleId:testedApp.bundleID]);
   XCTAssertEqualObjects(SPRINGBOARD_BUNDLE_ID, self.session.activeApplication.bundleID);
   [self.session launchApplicationWithBundleId:testedApp.bundleID
@@ -99,6 +92,14 @@ static NSString *const SETTINGS_BUNDLE_ID = @"com.apple.Preferences";
                                     arguments:nil
                                   environment:nil];
   XCTAssertEqualObjects(testedApp.bundleID, self.session.activeApplication.bundleID);
+}
+
+- (void)testLaunchUnattachedApp
+{
+  [FBUnattachedAppLauncher launchAppWithBundleId:SETTINGS_BUNDLE_ID];
+  XCTAssertNil(self.session.applications[SETTINGS_BUNDLE_ID]);
+  [self.session kill];
+  XCTAssertEqualObjects(SETTINGS_BUNDLE_ID, FBApplication.fb_activeApplication.bundleID);
 }
 
 @end

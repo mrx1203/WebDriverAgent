@@ -23,38 +23,44 @@ NSString *const FBSessionDoesNotExistException = @"FBSessionDoesNotExistExceptio
 NSString *const FBApplicationDeadlockDetectedException = @"FBApplicationDeadlockDetectedException";
 NSString *const FBElementAttributeUnknownException = @"FBElementAttributeUnknownException";
 NSString *const FBElementNotVisibleException = @"FBElementNotVisibleException";
+NSString *const FBTimeoutException = @"FBTimeoutException";
 
 @implementation FBExceptionHandler
 
-- (BOOL)handleException:(NSException *)exception forResponse:(RouteResponse *)response
+- (void)handleException:(NSException *)exception forResponse:(RouteResponse *)response
 {
-  static NSDictionary<NSString *, NSArray *> *exceptionsMapping;
-  static dispatch_once_t onceExceptionsMapping;
-  dispatch_once(&onceExceptionsMapping, ^{
-    exceptionsMapping = @{
-      FBApplicationDeadlockDetectedException: @[@(FBCommandStatusApplicationDeadlockDetected)],
-      FBSessionDoesNotExistException: @[@(FBCommandStatusNoSuchSession)],
-      FBInvalidArgumentException: @[@(FBCommandStatusInvalidArgument)],
-      FBElementAttributeUnknownException: @[@(FBCommandStatusInvalidSelector)],
-      FBAlertObstructingElementException: @[@(FBCommandStatusUnexpectedAlertPresent), @"Alert is obstructing view"],
-      FBApplicationCrashedException: @[@(FBCommandStatusApplicationCrashDetected)],
-      FBInvalidXPathException: @[@(FBCommandStatusInvalidXPathSelector)],
-      FBClassChainQueryParseException: @[@(FBCommandStatusInvalidSelector)],
-      FBElementNotVisibleException: @[@(FBCommandStatusElementNotVisible)],
-    };
-  });
-
-  NSArray *status = exceptionsMapping[exception.name];
-  if (nil == status) {
-    return NO;
+  FBCommandStatus *commandStatus;
+  NSString *traceback = [NSString stringWithFormat:@"%@", exception.callStackSymbols];
+  if ([exception.name isEqualToString:FBSessionDoesNotExistException]) {
+    commandStatus = [FBCommandStatus noSuchDriverErrorWithMessage:exception.reason
+                                                        traceback:traceback];
+  } else if ([exception.name isEqualToString:FBInvalidArgumentException]
+             || [exception.name isEqualToString:FBElementAttributeUnknownException]) {
+    commandStatus = [FBCommandStatus invalidArgumentErrorWithMessage:exception.reason
+                                                           traceback:traceback];
+  } else if ([exception.name isEqualToString:FBAlertObstructingElementException]) {
+    commandStatus =[FBCommandStatus unexpectedAlertOpenErrorWithMessage:nil
+                                                              traceback:traceback];
+  } else if ([exception.name isEqualToString:FBApplicationCrashedException]
+             || [exception.name isEqualToString:FBApplicationDeadlockDetectedException]) {
+    commandStatus = [FBCommandStatus invalidElementStateErrorWithMessage:exception.reason
+                                                               traceback:traceback];
+  } else if ([exception.name isEqualToString:FBInvalidXPathException]
+             || [exception.name isEqualToString:FBClassChainQueryParseException]) {
+    commandStatus = [FBCommandStatus invalidSelectorErrorWithMessage:exception.reason
+                                                           traceback:traceback];
+  } else if ([exception.name isEqualToString:FBElementNotVisibleException]) {
+    commandStatus = [FBCommandStatus elementNotVisibleErrorWithMessage:exception.reason
+                                                             traceback:traceback];
+  } else if ([exception.name isEqualToString:FBTimeoutException]) {
+      commandStatus = [FBCommandStatus timeoutErrorWithMessage:exception.reason
+                                                     traceback:traceback];
+  } else {
+    commandStatus = [FBCommandStatus unknownErrorWithMessage:exception.reason
+                                                   traceback:traceback];
   }
-
-  NSUInteger statusValue = [[status objectAtIndex:0] integerValue];
-  id<FBResponsePayload> payload = [status count] > 1
-    ? FBResponseWithStatus(statusValue, [status objectAtIndex:1])
-    : FBResponseWithStatus(statusValue, [exception reason]);
+  id<FBResponsePayload> payload = FBResponseWithStatus(commandStatus);
   [payload dispatchWithResponse:response];
-  return YES;
 }
 
 @end

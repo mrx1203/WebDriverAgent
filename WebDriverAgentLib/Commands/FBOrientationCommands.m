@@ -29,6 +29,8 @@ const struct FBWDOrientationValues FBWDOrientationValues = {
   .portraitUpsideDown = @"UIA_DEVICE_ORIENTATION_PORTRAIT_UPSIDEDOWN",
 };
 
+#if !TARGET_OS_TV
+
 @implementation FBOrientationCommands
 
 #pragma mark - <FBCommandHandler>
@@ -54,7 +56,7 @@ const struct FBWDOrientationValues FBWDOrientationValues = {
 {
   FBSession *session = request.session;
   NSString *orientation = [self.class interfaceOrientationForApplication:session.activeApplication];
-  return FBResponseWithStatus(FBCommandStatusNoError, [[self _wdOrientationsMapping] objectForKey:orientation]);
+  return FBResponseWithObject([[self _wdOrientationsMapping] objectForKey:orientation]);
 }
 
 + (id<FBResponsePayload>)handleSetOrientation:(FBRouteRequest *)request
@@ -63,14 +65,15 @@ const struct FBWDOrientationValues FBWDOrientationValues = {
   if ([self.class setDeviceOrientation:request.arguments[@"orientation"] forApplication:session.activeApplication]) {
     return FBResponseWithOK();
   }
-  return FBResponseWithStatus(FBCommandStatusRotationNotAllowed, @"Unable To Rotate Device");
+
+  return FBResponseWithUnknownErrorFormat(@"Unable To Rotate Device");
 }
 
 + (id<FBResponsePayload>)handleGetRotation:(FBRouteRequest *)request
 {
     XCUIDevice *device = [XCUIDevice sharedDevice];
     UIInterfaceOrientation orientation = request.session.activeApplication.interfaceOrientation;
-    return FBResponseWithStatus(FBCommandStatusNoError, device.fb_rotationMapping[@(orientation)]);
+    return FBResponseWithObject(device.fb_rotationMapping[@(orientation)]);
 }
 
 + (id<FBResponsePayload>)handleSetRotation:(FBRouteRequest *)request
@@ -79,7 +82,7 @@ const struct FBWDOrientationValues FBWDOrientationValues = {
     if ([self.class setDeviceRotation:request.arguments forApplication:session.activeApplication]) {
         return FBResponseWithOK();
     }
-    return FBResponseWithStatus(FBCommandStatusRotationNotAllowed, [NSString stringWithFormat:@"Rotation not supported: %@", request.arguments[@"rotation"]]);
+    return FBResponseWithUnknownErrorFormat(@"Rotation not supported: %@", request.arguments[@"rotation"]);
 }
 
 + (id<FBResponsePayload>)handleSetOrientation_Control:(FBRouteRequest *)request
@@ -90,11 +93,10 @@ const struct FBWDOrientationValues FBWDOrientationValues = {
 
 + (id<FBResponsePayload>)handleGetOrientation_Control:(FBRouteRequest *)request
 {
-  int *orientation = [XCUIDevice sharedDevice].orientation ;
-  //NSLog(@"====================orientation %d",orientation);
-  return FBResponseWithStatus(FBCommandStatusNoError, @{
+  UIDeviceOrientation orientation = [XCUIDevice sharedDevice].orientation ;
+  return FBResponseWithObject( @{
     @"func":@"orientation_Control",
-    @"orientation":[NSString stringWithFormat:@"%d",orientation]
+    @"orientation":[NSString stringWithFormat:@"%ld",(long)orientation]
   });
 }
 
@@ -165,3 +167,5 @@ const struct FBWDOrientationValues FBWDOrientationValues = {
 }
 
 @end
+
+#endif

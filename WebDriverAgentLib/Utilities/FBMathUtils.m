@@ -40,6 +40,7 @@ BOOL FBRectFuzzyEqualToRect(CGRect rect1, CGRect rect2, CGFloat threshold)
   FBSizeFuzzyEqualToSize(rect1.size, rect2.size, threshold);
 }
 
+#if !TARGET_OS_TV
 CGPoint FBInvertPointForApplication(CGPoint point, CGSize screenSize, UIInterfaceOrientation orientation)
 {
   switch (orientation) {
@@ -49,9 +50,9 @@ CGPoint FBInvertPointForApplication(CGPoint point, CGSize screenSize, UIInterfac
     case UIInterfaceOrientationPortraitUpsideDown:
       return CGPointMake(screenSize.width - point.x, screenSize.height - point.y);
     case UIInterfaceOrientationLandscapeLeft:
-      return CGPointMake(point.y, screenSize.height - point.x);
+      return CGPointMake(point.y, MAX(screenSize.width, screenSize.height) - point.x);
     case UIInterfaceOrientationLandscapeRight:
-      return CGPointMake(screenSize.width - point.y, point.x);
+      return CGPointMake(MIN(screenSize.width, screenSize.height) - point.y, point.x);
   }
 }
 
@@ -84,6 +85,7 @@ CGSize FBAdjustDimensionsForApplication(CGSize actualSize, UIInterfaceOrientatio
   }
   return actualSize;
 }
+#endif
 
 NSDictionary<NSString *, NSNumber *> *FBwdRectNoInf(NSDictionary<NSString *, NSNumber *> *wdRect)
 {

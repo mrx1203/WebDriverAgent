@@ -28,32 +28,7 @@
 #import "XCUIElement.h"
 #import "XCUIElement+FBIsVisible.h"
 #import "XCUIElementQuery.h"
-#import "XCEventGenerator.h"
-
-/*extern int freqTest(int cycles);
-static double GetCPUFrequency(void)
-{
-  volatile NSTimeInterval times[500];
-  
-  int sum = 0;
-  
-  for(int i = 0; i < 500; i++)
-  {
-    times[i] = [[NSProcessInfo processInfo] systemUptime];
-    sum += freqTest(10000);
-    times[i] = [[NSProcessInfo processInfo] systemUptime] - times[i];
-  }
-  
-  NSTimeInterval time = times[0];
-  for(int i = 1; i < 500; i++)
-  {
-    if(time > times[i])
-      time = times[i];
-  }
-  
-  double freq = 1300000.0 / time;
-  return freq/1000/1000;
-}*/
+#import "FBUnattachedAppLauncher.h"
 
 @implementation FBCustomCommands
 
@@ -74,17 +49,15 @@ static double GetCPUFrequency(void)
     [[FBRoute GET:@"/wda/screen"] respondWithTarget:self action:@selector(handleGetScreen:)],
     [[FBRoute GET:@"/wda/activeAppInfo"] respondWithTarget:self action:@selector(handleActiveAppInfo:)],
     [[FBRoute GET:@"/wda/activeAppInfo"].withoutSession respondWithTarget:self action:@selector(handleActiveAppInfo:)],
+#if !TARGET_OS_TV // tvOS does not provide relevant APIs
     [[FBRoute POST:@"/wda/setPasteboard"] respondWithTarget:self action:@selector(handleSetPasteboard:)],
     [[FBRoute POST:@"/wda/getPasteboard"] respondWithTarget:self action:@selector(handleGetPasteboard:)],
-    [[FBRoute GET:@"/wda/batteryInfo"].withoutSession respondWithTarget:self action:@selector(handleGetBatteryInfo:)],
+    [[FBRoute GET:@"/wda/batteryInfo"] respondWithTarget:self action:@selector(handleGetBatteryInfo:)],
+#endif
     [[FBRoute POST:@"/wda/pressButton"] respondWithTarget:self action:@selector(handlePressButtonCommand:)],
     [[FBRoute POST:@"/wda/siri/activate"] respondWithTarget:self action:@selector(handleActivateSiri:)],
-    
-    //Get CPU Frequency
-    //[[FBRoute GET:@"/wda/cpuFreq"].withoutSession respondWithTarget:self action:@selector(handleGetCpuFreq:)],
-    //用于远程控制的接口
-    [[FBRoute POST:@"/wda/swipe_control"].withoutSession respondWithTarget:self action:@selector(handleSwipe_Control:)],
-    [[FBRoute POST:@"/wda/click_control"].withoutSession respondWithTarget:self action:@selector(handleClick_Control:)],
+    [[FBRoute POST:@"/wda/apps/launchUnattached"].withoutSession respondWithTarget:self action:@selector(handleLaunchUnattachedApp:)],
+    [[FBRoute GET:@"/wda/device/info"] respondWithTarget:self action:@selector(handleGetDeviceInfo:)],
   ];
 }
 
@@ -95,7 +68,8 @@ static double GetCPUFrequency(void)
 {
   NSError *error;
   if (![[XCUIDevice sharedDevice] fb_goToHomescreenWithError:&error]) {
-    return FBResponseWithError(error);
+    return FBResponseWithStatus([FBCommandStatus unknownErrorWithMessage:error.description
+                                                               traceback:nil]);
   }
   return FBResponseWithOK();
 }
@@ -106,7 +80,7 @@ static double GetCPUFrequency(void)
   NSTimeInterval duration = (requestedDuration ? requestedDuration.doubleValue : 3.);
   NSError *error;
   if (![request.session.activeApplication fb_deactivateWithDuration:duration error:&error]) {
-    return FBResponseWithError(error);
+    return FBResponseWithUnknownError(error);
   }
   return FBResponseWithOK();
 }
@@ -119,7 +93,13 @@ static double GetCPUFrequency(void)
 
 + (id<FBResponsePayload>)handleDismissKeyboardCommand:(FBRouteRequest *)request
 {
+#if TARGET_OS_TV
+  if ([self isKeyboardPresentForApplication:request.session.activeApplication]) {
+    [[XCUIRemote sharedRemote] pressButton: XCUIRemoteButtonMenu];
+  }
+#else
   [request.session.activeApplication dismissKeyboard];
+#endif
   NSError *error;
   NSString *errorDescription = @"The keyboard cannot be dismissed. Try to dismiss it in the way supported by your application under test.";
   if ([UIDevice.currentDevice userInterfaceIdiom] == UIUserInterfaceIdiomPhone) {
@@ -130,14 +110,20 @@ static double GetCPUFrequency(void)
      timeout:5]
     timeoutErrorMessage:errorDescription]
    spinUntilTrue:^BOOL{
-     XCUIElement *foundKeyboard = [request.session.activeApplication descendantsMatchingType:XCUIElementTypeKeyboard].fb_firstMatch;
-     return !(foundKeyboard && foundKeyboard.fb_isVisible);
+     return ![self isKeyboardPresentForApplication:request.session.activeApplication];
    }
    error:&error];
   if (!isKeyboardNotPresent) {
-    return FBResponseWithError(error);
+    return FBResponseWithStatus([FBCommandStatus elementNotVisibleErrorWithMessage:error.description traceback:[NSString stringWithFormat:@"%@", NSThread.callStackSymbols]]);
   }
   return FBResponseWithOK();
+}
+
+#pragma mark - Helpers
+
++ (BOOL)isKeyboardPresentForApplication:(XCUIApplication *)application {
+  XCUIElement *foundKeyboard = [application.fb_query descendantsMatchingType:XCUIElementTypeKeyboard].fb_firstMatch;
+  return foundKeyboard && foundKeyboard.fb_isVisible;
 }
 
 + (id<FBResponsePayload>)handleGetScreen:(FBRouteRequest *)request
@@ -158,7 +144,7 @@ static double GetCPUFrequency(void)
 {
   NSError *error;
   if (![[XCUIDevice sharedDevice] fb_lockScreen:&error]) {
-    return FBResponseWithError(error);
+    return FBResponseWithUnknownError(error);
   }
   return FBResponseWithOK();
 }
@@ -166,7 +152,7 @@ static double GetCPUFrequency(void)
 + (id<FBResponsePayload>)handleIsLocked:(FBRouteRequest *)request
 {
   BOOL isLocked = [XCUIDevice sharedDevice].fb_isScreenLocked;
-  return FBResponseWithStatus(FBCommandStatusNoError, @{
+  return FBResponseWithObject(@{
       @"isLocked":isLocked ? @YES : @NO,
       @"func":@"locked"
   });
@@ -176,33 +162,70 @@ static double GetCPUFrequency(void)
 {
   NSError *error;
   if (![[XCUIDevice sharedDevice] fb_unlockScreen:&error]) {
-    return FBResponseWithError(error);
+    return FBResponseWithUnknownError(error);
   }
   return FBResponseWithOK();
 }
 
 + (id<FBResponsePayload>)handleActiveAppInfo:(FBRouteRequest *)request
 {
-  XCUIApplication *app = FBApplication.fb_activeApplication;
-  return FBResponseWithStatus(FBCommandStatusNoError, @{
+  XCUIApplication *app = request.session.activeApplication ?: FBApplication.fb_activeApplication;
+  return FBResponseWithObject(@{
     @"pid": @(app.processID),
     @"bundleId": app.bundleID,
-    @"name": app.identifier
+    @"name": app.identifier,
+    @"processArguments": [self processArguments:app],
   });
 }
 
+/**
+ * Returns current active app and its arguments of active session
+ *
+ * @return The dictionary of current active bundleId and its process/environment argumens
+ *
+ * @example
+ *
+ *     [self currentActiveApplication]
+ *     //=> {
+ *     //       "processArguments" : {
+ *     //       "env" : {
+ *     //           "HAPPY" : "testing"
+ *     //       },
+ *     //       "args" : [
+ *     //           "happy",
+ *     //           "tseting"
+ *     //       ]
+ *     //   }
+ *
+ *     [self currentActiveApplication]
+ *     //=> {}
+ */
++ (NSDictionary *)processArguments:(XCUIApplication *)app
+{
+  // Can be nil if no active activation is defined by XCTest
+  if (app == nil) {
+    return @{};
+  }
+
+  return
+  @{
+    @"args": app.launchArguments,
+    @"env": app.launchEnvironment
+  };
+}
+
+#if !TARGET_OS_TV
 + (id<FBResponsePayload>)handleSetPasteboard:(FBRouteRequest *)request
 {
   NSString *contentType = request.arguments[@"contentType"] ?: @"plaintext";
   NSData *content = [[NSData alloc] initWithBase64EncodedString:(NSString *)request.arguments[@"content"]
                                                         options:NSDataBase64DecodingIgnoreUnknownCharacters];
   if (nil == content) {
-    return FBResponseWithStatus(FBCommandStatusInvalidArgument, @"Cannot decode the pasteboard content from base64");
+    return FBResponseWithStatus([FBCommandStatus invalidArgumentErrorWithMessage:@"Cannot decode the pasteboard content from base64" traceback:nil]);
   }
-  NSLog(@"================handleSetPasteboard content %@",content);
   NSError *error;
   if (![FBPasteboard setData:content forType:contentType error:&error]) {
-    return FBResponseWithError(error);
+    return FBResponseWithUnknownError(error);
   }
   return FBResponseWithOK();
 }
@@ -213,13 +236,12 @@ static double GetCPUFrequency(void)
   NSError *error;
   id result = [FBPasteboard dataForType:contentType error:&error];
   if (nil == result) {
-    return FBResponseWithError(error);
+    return FBResponseWithUnknownError(error);
   }
-  NSLog(@"================handleGetPasteboard content %@",result);
-  return FBResponseWithStatus(FBCommandStatusNoError,@{
-              @"content":[result base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength],
-              @"func":@"getPasteboard"
-              });
+  return FBResponseWithObject(@{
+    @"content":[result base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength],
+    @"func":@"getPasteboard"
+  });
 }
 
 + (id<FBResponsePayload>)handleGetBatteryInfo:(FBRouteRequest *)request
@@ -227,18 +249,19 @@ static double GetCPUFrequency(void)
   if (![[UIDevice currentDevice] isBatteryMonitoringEnabled]) {
     [[UIDevice currentDevice] setBatteryMonitoringEnabled:YES];
   }
-  return FBResponseWithStatus(FBCommandStatusNoError, @{
+  return FBResponseWithObject(@{
     @"level": @([UIDevice currentDevice].batteryLevel),
     @"state": @([UIDevice currentDevice].batteryState),
     @"func":@"batteryInfo"
   });
 }
+#endif
 
 + (id<FBResponsePayload>)handlePressButtonCommand:(FBRouteRequest *)request
 {
   NSError *error;
   if (![XCUIDevice.sharedDevice fb_pressButton:(id)request.arguments[@"name"] error:&error]) {
-    return FBResponseWithError(error);
+    return FBResponseWithUnknownError(error);
   }
   return FBResponseWithOK();
 }
@@ -247,40 +270,63 @@ static double GetCPUFrequency(void)
 {
   NSError *error;
   if (![XCUIDevice.sharedDevice fb_activateSiriVoiceRecognitionWithText:(id)request.arguments[@"text"] error:&error]) {
-    return FBResponseWithError(error);
+    return FBResponseWithUnknownError(error);
   }
   return FBResponseWithOK();
 }
 
-/*+(id<FBResponsePayload>)handleGetCpuFreq:(FBRouteRequest *)request
++ (id <FBResponsePayload>)handleLaunchUnattachedApp:(FBRouteRequest *)request
 {
-  NSString *freq =[NSString stringWithFormat:@"%.2f",GetCPUFrequency()];
-  //NSLog(@"===================%@",freq);
-  
-  return FBResponseWithStatus(FBCommandStatusNoError,@{
-      @"CPUFREQ":freq
-    });
-}*/
-
-+ (id<FBResponsePayload>)handleClick_Control:(FBRouteRequest *)request
-{
-  CGPoint tapPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
-  double duration = [request.arguments[@"duration"] doubleValue];
-  NSLog(@"x=%@ y=%@ duration=%@",request.arguments[@"x"],request.arguments[@"y"],request.arguments[@"duration"]);
-  //[[XCEventGenerator sharedGenerator] pressAtPoint:tapPoint forDuration:duration liftAtPoint:tapPoint velocity:500 orientation:0 name:@"tap" handler:*(XCSynthesizedEventRecord *record,NSError *error){}];
-  [[XCEventGenerator sharedGenerator] pressAtPoint:tapPoint forDuration:duration orientation:0 handler:^(XCSynthesizedEventRecord *record, NSError *error) {} ];
-  return FBResponseWithOK();
+  NSString *bundle = (NSString *)request.arguments[@"bundleId"];
+  if ([FBUnattachedAppLauncher launchAppWithBundleId:bundle]) {
+    return FBResponseWithOK();
+  }
+  return FBResponseWithStatus([FBCommandStatus unknownErrorWithMessage:@"LSApplicationWorkspace failed to launch app" traceback:nil]);
 }
 
-+ (id<FBResponsePayload>)handleSwipe_Control:(FBRouteRequest *)request
++ (id<FBResponsePayload>)handleGetDeviceInfo:(FBRouteRequest *)request
 {
-  CGPoint startPoint = CGPointMake((CGFloat)[request.arguments[@"fromX"] doubleValue], (CGFloat)[request.arguments[@"fromY"] doubleValue]);
-  CGPoint endPoint = CGPointMake((CGFloat)[request.arguments[@"toX"] doubleValue], (CGFloat)[request.arguments[@"toY"] doubleValue]);
-  NSTimeInterval duration = [request.arguments[@"duration"] doubleValue];
-  
-  NSLog(@"fromX=%@ fromY=%@ toX=%@ toY=%@ duration=%@",request.arguments[@"fromX"],request.arguments[@"fromY"],
-        request.arguments[@"toX"],request.arguments[@"toY"],request.arguments[@"duration"]);
-  [[XCEventGenerator sharedGenerator] pressAtPoint:startPoint forDuration:duration liftAtPoint:endPoint velocity:500 orientation:0 name:@"drag" handler:^(XCSynthesizedEventRecord *record,NSError *error){}];
-  return FBResponseWithOK();
+  // Returns locale like ja_EN and zh-Hant_US. The format depends on OS
+  // Developers should use this locale by default
+  // https://developer.apple.com/documentation/foundation/nslocale/1414388-autoupdatingcurrentlocale
+  NSString *currentLocale = [[NSLocale autoupdatingCurrentLocale] localeIdentifier];
+
+  return FBResponseWithObject(@{
+    @"currentLocale": currentLocale,
+    @"timeZone": self.timeZone,
+    @"name": UIDevice.currentDevice.name,
+    @"model": UIDevice.currentDevice.model,
+    @"uuid": [UIDevice.currentDevice.identifierForVendor UUIDString] ?: @"unknown",
+    // https://developer.apple.com/documentation/uikit/uiuserinterfaceidiom?language=objc
+    @"userInterfaceIdiom": @(UIDevice.currentDevice.userInterfaceIdiom),
+#if TARGET_OS_SIMULATOR
+    @"isSimulator": @(YES),
+#else
+    @"isSimulator": @(NO),
+#endif
+  });
 }
+
+/**
+ * @return The string of TimeZone. Returns TZ timezone id by default. Returns TimeZone name by Apple if TZ timezone id is not available.
+ */
++ (NSString *)timeZone
+{
+  NSTimeZone *localTimeZone = [NSTimeZone localTimeZone];
+  // Apple timezone name like "US/New_York"
+  NSString *timeZoneAbb = [localTimeZone abbreviation];
+  if (timeZoneAbb == nil) {
+    return [localTimeZone name];
+  }
+
+  // Convert timezone name to ids like "America/New_York" as TZ database Time Zones format
+  // https://developer.apple.com/documentation/foundation/nstimezone
+  NSString *timeZoneId = [[NSTimeZone timeZoneWithAbbreviation:timeZoneAbb] name];
+  if (timeZoneId != nil) {
+    return timeZoneId;
+  }
+
+  return [localTimeZone name];
+}
+
 @end

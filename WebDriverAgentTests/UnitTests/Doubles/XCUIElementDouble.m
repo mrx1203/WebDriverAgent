@@ -26,6 +26,10 @@
     self.wdVisible = YES;
     self.wdAccessible = YES;
     self.wdEnabled = YES;
+    self.wdSelected = YES;
+#if TARGET_OS_TV
+    self.wdFocused = YES;
+#endif
     self.children = @[];
     self.wdRect =  @{@"x": @0,
                      @"y": @0,
@@ -45,7 +49,7 @@
   return @"test";
 }
 
-- (void)resolve
+- (void)fb_nativeResolve
 {
   self.didResolve = YES;
 }

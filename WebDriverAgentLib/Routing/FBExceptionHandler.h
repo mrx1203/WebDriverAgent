@@ -27,6 +27,9 @@ extern NSString *const FBInvalidArgumentException;
 /*! Exception used to notify about invisibility of an element while trying to interact with it */
 extern NSString *const FBElementNotVisibleException;
 
+/*! Exception used to notify about a timeout */
+extern NSString *const FBTimeoutException;
+
 /**
  Class used to handle exceptions raised by command handlers
  */
@@ -37,9 +40,8 @@ extern NSString *const FBElementNotVisibleException;
 
  @param exception exception that needs handling
  @param response response related to that exception
- @return YES, if exception was handled, otherwise NO
  */
-- (BOOL)handleException:(NSException *)exception forResponse:(RouteResponse *)response;
+- (void)handleException:(NSException *)exception forResponse:(RouteResponse *)response;
 
 @end
 

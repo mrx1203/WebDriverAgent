@@ -40,8 +40,11 @@
   [textField tap];
   XCTAssertTrue([textField fb_clearTextWithError:&error]);
   [textField pressForDuration:2.0];
-  XCUIElement *pasteItem = [[self.testedApplication descendantsMatchingType:XCUIElementTypeAny]
-                            matchingIdentifier:@"Paste"].fb_firstMatch;
+  XCUIElementQuery *pastItemsQuery = [[self.testedApplication descendantsMatchingType:XCUIElementTypeAny] matchingIdentifier:@"Paste"];
+  if (![pastItemsQuery.element waitForExistenceWithTimeout:2.0]) {
+    XCTFail(@"No matched element named 'Paste'");
+  }
+  XCUIElement *pasteItem = pastItemsQuery.fb_firstMatch;
   XCTAssertNotNil(pasteItem);
   [pasteItem tap];
   FBAssertWaitTillBecomesTrue([textField.value isEqualToString:text]);
@@ -63,7 +66,7 @@
                            matchingIdentifier:@"Copy"].fb_firstMatch;
   XCTAssertNotNil(copyItem);
   [copyItem tap];
-  [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1]];
+  FBWaitExact(1.0);
   NSData *result = [FBPasteboard dataForType:@"plaintext" error:&error];
   XCTAssertNil(error);
   XCTAssertEqualObjects(textField.value, [[NSString alloc] initWithData:result encoding:NSUTF8StringEncoding]);

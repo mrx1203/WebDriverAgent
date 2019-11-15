@@ -15,10 +15,17 @@
 #import "FBXCodeCompatibility.h"
 #import "XCTestPrivateSymbols.h"
 #import "XCElementSnapshot.h"
+#include <dlfcn.h>
 
 static NSUInteger const DefaultStartingPort = 8100;
 static NSUInteger const DefaultMjpegServerPort = 9100;
 static NSUInteger const DefaultPortRange = 100;
+
+static char const *const controllerPrefBundlePath = "/System/Library/PrivateFrameworks/TextInput.framework/TextInput";
+static NSString *const controllerClassName = @"TIPreferencesController";
+static NSString *const FBKeyboardAutocorrectionKey = @"KeyboardAutocorrection";
+static NSString *const FBKeyboardPredictionKey = @"KeyboardPrediction";
+static NSString *const axSettingsClassName = @"AXSettings";
 
 static BOOL FBShouldUseTestManagerForVisibilityDetection = NO;
 static BOOL FBShouldUseSingletonTestManager = YES;
@@ -27,9 +34,17 @@ static BOOL FBShouldWaitForQuiescence = NO;
 static NSString *FBElementResponseAttributes = @"type,label";
 static NSUInteger FBMaxTypingFrequency = 60;
 static NSUInteger FBMjpegServerScreenshotQuality = 60;
-static NSUInteger FBMjpegServerFramerate = 60;
+static NSUInteger FBMjpegServerFramerate = 30;
 static NSUInteger FBScreenshotQuality = 1;
 static NSUInteger FBMjpegScalingFactor = 100;
+static NSTimeInterval FBSnapshotTimeout = 15.;
+static BOOL FBShouldUseFirstMatch = NO;
+// This is diabled by default because enabling it prevents the accessbility snapshot to be taken
+// (it always errors with kxIllegalArgument error)
+static BOOL FBIncludeNonModalElements = NO;
+static NSString *FBAcceptAlertButtonSelector = @"";
+static NSString *FBDismissAlertButtonSelector = @"";
+
 
 @implementation FBConfiguration
 
@@ -55,7 +70,6 @@ static NSUInteger FBMjpegScalingFactor = 100;
   // Existence of USE_PORT in the environment implies the port range is managed by the launching process.
   if (NSProcessInfo.processInfo.environment[@"USE_PORT"] &&
       [NSProcessInfo.processInfo.environment[@"USE_PORT"] length] > 0) {
-    NSLog(@"===================%@",NSProcessInfo.processInfo.environment[@"USE_PORT"]);
     return NSMakeRange([NSProcessInfo.processInfo.environment[@"USE_PORT"] integerValue] , 1);
   }
 
@@ -70,7 +84,6 @@ static NSUInteger FBMjpegScalingFactor = 100;
   
   if (NSProcessInfo.processInfo.environment[@"MJPEG_SERVER_PORT"] &&
       [NSProcessInfo.processInfo.environment[@"MJPEG_SERVER_PORT"] length] > 0) {
-    NSLog(@"===================%@",NSProcessInfo.processInfo.environment[@"MJPEG_SERVER_PORT"]);
     return [NSProcessInfo.processInfo.environment[@"MJPEG_SERVER_PORT"] integerValue];
   }
 
@@ -186,7 +199,163 @@ static NSUInteger FBMjpegScalingFactor = 100;
   FBScreenshotQuality = quality;
 }
 
+// Works for Simulator and Real devices
++ (void)configureDefaultKeyboardPreferences
+{
+#if TARGET_OS_SIMULATOR
+  // Force toggle software keyboard on.
+  // This can avoid 'Keyboard is not present' error which can happen
+  // when send_keys are called by client
+  [[UIKeyboardImpl sharedInstance] setAutomaticMinimizationEnabled:NO];
+  [[UIKeyboardImpl sharedInstance] setSoftwareKeyboardShownByTouch:YES];
+#endif
+
+  void *handle = dlopen(controllerPrefBundlePath, RTLD_LAZY);
+
+  Class controllerClass = NSClassFromString(controllerClassName);
+
+  TIPreferencesController *controller = [controllerClass sharedPreferencesController];
+  // Auto-Correction in Keyboards
+  // 'setAutocorrectionEnabled' Was in TextInput.framework/TIKeyboardState.h over iOS 10.3
+  if ([controller respondsToSelector:@selector(setAutocorrectionEnabled:)]) {
+    // Under iOS 10.2
+    controller.autocorrectionEnabled = NO;
+  } else if ([controller respondsToSelector:@selector(setValue:forPreferenceKey:)]) {
+    // Over iOS 10.3
+    [controller setValue:@NO forPreferenceKey:FBKeyboardAutocorrectionKey];
+  }
+
+  // Predictive in Keyboards
+  if ([controller respondsToSelector:@selector(setPredictionEnabled:)]) {
+    controller.predictionEnabled = NO;
+  } else if ([controller respondsToSelector:@selector(setValue:forPreferenceKey:)]) {
+    [controller setValue:@NO forPreferenceKey:FBKeyboardPredictionKey];
+  }
+
+  // To dismiss keyboard tutorial on iOS 11+ (iPad)
+  if ([controller respondsToSelector:@selector(setValue:forPreferenceKey:)]) {
+    if (isSDKVersionGreaterThanOrEqualTo(@"11.0")) {
+      [controller setValue:@YES forPreferenceKey:@"DidShowGestureKeyboardIntroduction"];
+    }
+    if (isSDKVersionGreaterThanOrEqualTo(@"13.0")) {
+      [controller setValue:@YES forPreferenceKey:@"DidShowContinuousPathIntroduction"];
+    }
+    [controller synchronizePreferences];
+  }
+
+  dlclose(handle);
+}
+
++ (BOOL)keyboardAutocorrection
+{
+  return [self keyboardsPreference:FBKeyboardAutocorrectionKey];
+}
+
++ (void)setKeyboardAutocorrection:(BOOL)isEnabled
+{
+  [self configureKeyboardsPreference:isEnabled forPreferenceKey:FBKeyboardAutocorrectionKey];
+}
+
++ (BOOL)keyboardPrediction
+{
+  return [self keyboardsPreference:FBKeyboardPredictionKey];
+}
+
++ (void)setKeyboardPrediction:(BOOL)isEnabled
+{
+  [self configureKeyboardsPreference:isEnabled forPreferenceKey:FBKeyboardPredictionKey];
+}
+
++ (void)setSnapshotTimeout:(NSTimeInterval)timeout
+{
+  FBSnapshotTimeout = timeout;
+}
+
++ (NSTimeInterval)snapshotTimeout
+{
+  return FBSnapshotTimeout;
+}
+
++ (void)setUseFirstMatch:(BOOL)enabled
+{
+  FBShouldUseFirstMatch = enabled;
+}
+
++ (BOOL)useFirstMatch
+{
+  return FBShouldUseFirstMatch;
+}
+
++ (void)setIncludeNonModalElements:(BOOL)isEnabled
+{
+  FBIncludeNonModalElements = isEnabled;
+}
+
++ (BOOL)includeNonModalElements
+{
+  return FBIncludeNonModalElements;
+}
+
++ (void)setAcceptAlertButtonSelector:(NSString *)classChainSelector
+{
+  FBAcceptAlertButtonSelector = classChainSelector;
+}
+
++ (NSString *)acceptAlertButtonSelector
+{
+  return FBAcceptAlertButtonSelector;
+}
+
++ (void)setDismissAlertButtonSelector:(NSString *)classChainSelector
+{
+  FBDismissAlertButtonSelector = classChainSelector;
+}
+
++ (NSString *)dismissAlertButtonSelector
+{
+  return FBDismissAlertButtonSelector;
+}
+
 #pragma mark Private
+
++ (BOOL)keyboardsPreference:(nonnull NSString *)key
+{
+  Class controllerClass = NSClassFromString(controllerClassName);
+  TIPreferencesController *controller = [controllerClass sharedPreferencesController];
+  if ([key isEqualToString:FBKeyboardAutocorrectionKey]) {
+    return [controller boolForPreferenceKey:FBKeyboardAutocorrectionKey];
+  } else if ([key isEqualToString:FBKeyboardPredictionKey]) {
+    return [controller boolForPreferenceKey:FBKeyboardPredictionKey];
+  }
+  @throw [[FBErrorBuilder.builder withDescriptionFormat:@"No available keyboardsPreferenceKey: '%@'", key] build];
+}
+
++ (void)configureKeyboardsPreference:(BOOL)enable forPreferenceKey:(nonnull NSString *)key
+{
+  void *handle = dlopen(controllerPrefBundlePath, RTLD_LAZY);
+  Class controllerClass = NSClassFromString(controllerClassName);
+
+  TIPreferencesController *controller = [controllerClass sharedPreferencesController];
+
+  if ([key isEqualToString:FBKeyboardAutocorrectionKey]) {
+    // Auto-Correction in Keyboards
+    if ([controller respondsToSelector:@selector(setAutocorrectionEnabled:)]) {
+      controller.autocorrectionEnabled = enable;
+    } else {
+      [controller setValue:@(enable) forPreferenceKey:FBKeyboardAutocorrectionKey];
+    }
+  } else if ([key isEqualToString:FBKeyboardPredictionKey]) {
+    // Predictive in Keyboards
+    if ([controller respondsToSelector:@selector(setPredictionEnabled:)]) {
+      controller.predictionEnabled = enable;
+    } else {
+      [controller setValue:@(enable) forPreferenceKey:FBKeyboardPredictionKey];
+    }
+  }
+
+  [controller synchronizePreferences];
+  dlclose(handle);
+}
 
 + (NSString*)valueFromArguments: (NSArray<NSString *> *)arguments forKey: (NSString*)key
 {
@@ -219,4 +388,27 @@ static NSUInteger FBMjpegScalingFactor = 100;
   return NSMakeRange(port, 1);
 }
 
++ (void)setReduceMotionEnabled:(BOOL)isEnabled
+{
+  Class settingsClass = NSClassFromString(axSettingsClassName);
+  AXSettings *settings = [settingsClass sharedInstance];
+
+  // Below does not work on real devices because of iOS security model
+  //  (lldb) po settings.reduceMotionEnabled = isEnabled
+  //  2019-08-21 22:58:19.776165+0900 WebDriverAgentRunner-Runner[322:13361] [User Defaults] Couldn't write value for key ReduceMotionEnabled in CFPrefsPlistSource<0x28111a700> (Domain: com.apple.Accessibility, User: kCFPreferencesCurrentUser, ByHost: No, Container: (null), Contents Need Refresh: No): setting preferences outside an application's container requires user-preference-write or file-write-data sandbox access
+  if ([settings respondsToSelector:@selector(setReduceMotionEnabled:)]) {
+    [settings setReduceMotionEnabled:isEnabled];
+  }
+}
+
++ (BOOL)reduceMotionEnabled
+{
+  Class settingsClass = NSClassFromString(axSettingsClassName);
+  AXSettings *settings = [settingsClass sharedInstance];
+
+  if ([settings respondsToSelector:@selector(reduceMotionEnabled)]) {
+    return settings.reduceMotionEnabled;
+  }
+  return NO;
+}
 @end

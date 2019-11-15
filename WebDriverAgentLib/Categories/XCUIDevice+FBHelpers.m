@@ -20,12 +20,16 @@
 #import "FBMacros.h"
 #import "FBMathUtils.h"
 #import "FBXCodeCompatibility.h"
+#import "XCTestManager_ManagerInterface-Protocol.h"
+#import "FBXCTestDaemonsProxy.h"
+#import <MobileCoreServices/MobileCoreServices.h>
 
 #import "XCUIDevice.h"
 #import "XCUIScreen.h"
 
 static const NSTimeInterval FBHomeButtonCoolOffTime = 1.;
-static const NSTimeInterval FBScreenLockTimeout = 5.;
+//static const NSTimeInterval FBScreenLockTimeout = 5.;
+static const NSTimeInterval SCREENSHOT_TIMEOUT = 2;
 
 @implementation XCUIDevice (FBHelpers)
 
@@ -39,14 +43,14 @@ static bool fb_isLocked;
 + (void)fb_registerAppforDetectLockState
 {
   int notify_token;
-  #pragma clang diagnostic push
-  #pragma clang diagnostic ignored "-Wstrict-prototypes"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wstrict-prototypes"
   notify_register_dispatch("com.apple.springboard.lockstate", &notify_token, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^(int token) {
     uint64_t state = UINT64_MAX;
     notify_get_state(token, &state);
     fb_isLocked = state != 0;
   });
-  #pragma clang diagnostic pop
+#pragma clang diagnostic pop
 }
 
 - (BOOL)fb_goToHomescreenWithError:(NSError **)error
@@ -71,7 +75,7 @@ static bool fb_isLocked;
   }
   [self pressLockButton];
   return YES;
- /* return [[[[FBRunLoopSpinner new]
+  /*return [[[[FBRunLoopSpinner new]
             timeout:FBScreenLockTimeout]
            timeoutErrorMessage:@"Timed out while waiting until the screen gets locked"]
           spinUntilTrue:^BOOL{
@@ -90,15 +94,19 @@ static bool fb_isLocked;
     return YES;
   }
   [self pressButton:XCUIDeviceButtonHome];
-  //[[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:FBHomeButtonCoolOffTime]];
+  [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:FBHomeButtonCoolOffTime]];
+#if !TARGET_OS_TV
   if (SYSTEM_VERSION_LESS_THAN(@"10.0")) {
     [[FBApplication fb_activeApplication] swipeRight];
   } else {
     [self pressButton:XCUIDeviceButtonHome];
   }
+#else
+  [self pressButton:XCUIDeviceButtonHome];
+#endif
   return YES;
-  //[[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:FBHomeButtonCoolOffTime]];
-  /*return [[[[FBRunLoopSpinner new]
+  /*[[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:FBHomeButtonCoolOffTime]];
+  return [[[[FBRunLoopSpinner new]
             timeout:FBScreenLockTimeout]
            timeoutErrorMessage:@"Timed out while waiting until the screen gets unlocked"]
           spinUntilTrue:^BOOL{
@@ -108,16 +116,33 @@ static bool fb_isLocked;
 
 - (NSData *)fb_screenshotWithError:(NSError*__autoreleasing*)error
 {
-  NSData* screenshotData = [self fb_rawScreenshotWithQuality:FBConfiguration.screenshotQuality rect:CGRectNull error:error];
+  NSData* screenshotData = [self fb_rawScreenshotWithQuality:FBConfiguration.screenshotQuality error:error];
   if (nil == screenshotData) {
     return nil;
   }
+#if TARGET_OS_TV
+  return FBAdjustScreenshotOrientationForApplication(screenshotData);
+#else
   return FBAdjustScreenshotOrientationForApplication(screenshotData, FBApplication.fb_activeApplication.interfaceOrientation);
+#endif
 }
 
-- (NSData *)fb_rawScreenshotWithQuality:(NSUInteger)quality rect:(CGRect)rect error:(NSError*__autoreleasing*)error
+- (NSData *)fb_rawScreenshotWithQuality:(NSUInteger)quality error: (NSError*__autoreleasing*) error
 {
-  return [XCUIScreen.mainScreen screenshotDataForQuality:quality rect:rect error:error];
+  if ([XCUIDevice fb_isNewScreenshotAPISupported]) {
+    return [XCUIScreen.mainScreen screenshotDataForQuality:quality rect:CGRectNull error:error];
+  } else {
+    id<XCTestManager_ManagerInterface> proxy = [FBXCTestDaemonsProxy testRunnerProxy];
+    __block NSData *screenshotData = nil;
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    [proxy _XCT_requestScreenshotWithReply:^(NSData *data, NSError *screenshotError) {
+      screenshotData = data;
+      *error = screenshotError;
+      dispatch_semaphore_signal(sem);
+    }];
+    dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SCREENSHOT_TIMEOUT * NSEC_PER_SEC)));
+    return screenshotData;
+  }
 }
 
 - (BOOL)fb_fingerTouchShouldMatch:(BOOL)shouldMatch
@@ -129,6 +154,16 @@ static bool fb_isLocked;
     name = "com.apple.BiometricKit_Sim.fingerTouch.nomatch";
   }
   return notify_post(name) == NOTIFY_STATUS_OK;
+}
+
++ (BOOL)fb_isNewScreenshotAPISupported
+{
+  static dispatch_once_t newScreenshotAPISupported;
+  static BOOL result;
+  dispatch_once(&newScreenshotAPISupported, ^{
+    result = [(NSObject *)[FBXCTestDaemonsProxy testRunnerProxy] respondsToSelector:@selector(_XCT_requestScreenshotOfScreenWithID:withRect:uti:compressionQuality:withReply:)];
+  });
+  return result;
 }
 
 - (NSString *)fb_wifiIPAddress
@@ -168,7 +203,7 @@ static bool fb_isLocked;
              withDescriptionFormat:@"'%@' is not a valid URL", url]
             buildError:error];
   }
-  
+
   id siriService = [self valueForKey:@"siriService"];
   if (nil != siriService) {
     return [self fb_activateSiriVoiceRecognitionWithText:[NSString stringWithFormat:@"Open {%@}", url] error:error];
@@ -207,6 +242,70 @@ static bool fb_isLocked;
   }
 }
 
+#if TARGET_OS_TV
+- (BOOL)fb_pressButton:(NSString *)buttonName error:(NSError **)error
+{
+  NSMutableArray<NSString *> *supportedButtonNames = [NSMutableArray array];
+  NSInteger remoteButton = -1; // no remote button
+  if ([buttonName.lowercaseString isEqualToString:@"home"]) {
+    //  XCUIRemoteButtonHome        = 7
+    remoteButton = XCUIRemoteButtonHome;
+  }
+  [supportedButtonNames addObject:@"home"];
+
+  // https://developer.apple.com/design/human-interface-guidelines/tvos/remote-and-controllers/remote/
+  if ([buttonName.lowercaseString isEqualToString:@"up"]) {
+    //  XCUIRemoteButtonUp          = 0,
+    remoteButton = XCUIRemoteButtonUp;
+  }
+  [supportedButtonNames addObject:@"up"];
+
+  if ([buttonName.lowercaseString isEqualToString:@"down"]) {
+    //  XCUIRemoteButtonDown        = 1,
+    remoteButton = XCUIRemoteButtonDown;
+  }
+  [supportedButtonNames addObject:@"down"];
+
+  if ([buttonName.lowercaseString isEqualToString:@"left"]) {
+    //  XCUIRemoteButtonLeft        = 2,
+    remoteButton = XCUIRemoteButtonLeft;
+  }
+  [supportedButtonNames addObject:@"left"];
+
+  if ([buttonName.lowercaseString isEqualToString:@"right"]) {
+    //  XCUIRemoteButtonRight       = 3,
+    remoteButton = XCUIRemoteButtonRight;
+  }
+  [supportedButtonNames addObject:@"right"];
+
+  if ([buttonName.lowercaseString isEqualToString:@"menu"]) {
+    //  XCUIRemoteButtonMenu        = 5,
+    remoteButton = XCUIRemoteButtonMenu;
+  }
+  [supportedButtonNames addObject:@"menu"];
+
+  if ([buttonName.lowercaseString isEqualToString:@"playpause"]) {
+    //  XCUIRemoteButtonPlayPause   = 6,
+    remoteButton = XCUIRemoteButtonPlayPause;
+  }
+  [supportedButtonNames addObject:@"playpause"];
+
+  if ([buttonName.lowercaseString isEqualToString:@"select"]) {
+    //  XCUIRemoteButtonSelect      = 4,
+    remoteButton = XCUIRemoteButtonSelect;
+  }
+  [supportedButtonNames addObject:@"select"];
+
+  if (remoteButton == -1) {
+    return [[[FBErrorBuilder builder]
+             withDescriptionFormat:@"The button '%@' is unknown. Only the following button names are supported: %@", buttonName, supportedButtonNames]
+            buildError:error];
+  }
+  [[XCUIRemote sharedRemote] pressButton:remoteButton];
+  return YES;
+}
+#else
+
 - (BOOL)fb_pressButton:(NSString *)buttonName error:(NSError **)error
 {
   NSMutableArray<NSString *> *supportedButtonNames = [NSMutableArray array];
@@ -225,6 +324,7 @@ static bool fb_isLocked;
   [supportedButtonNames addObject:@"volumeUp"];
   [supportedButtonNames addObject:@"volumeDown"];
 #endif
+
   if (dstButton == 0) {
     return [[[FBErrorBuilder builder]
              withDescriptionFormat:@"The button '%@' is unknown. Only the following button names are supported: %@", buttonName, supportedButtonNames]
@@ -233,5 +333,6 @@ static bool fb_isLocked;
   [self pressButton:dstButton];
   return YES;
 }
+#endif
 
 @end

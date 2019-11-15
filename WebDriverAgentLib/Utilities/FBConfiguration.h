@@ -9,6 +9,10 @@
 
 #import <Foundation/Foundation.h>
 
+#import "AXSettings.h"
+#import "UIKeyboardImpl.h"
+#import "TIPreferencesController.h"
+
 NS_ASSUME_NONNULL_BEGIN
 
 /**
@@ -104,6 +108,84 @@ NS_ASSUME_NONNULL_BEGIN
 + (BOOL)verboseLoggingEnabled;
 
 + (BOOL)shouldLoadSnapshotWithAttributes;
+
+/**
+ * Configure keyboards preference to make test running stable
+ */
++ (void)configureDefaultKeyboardPreferences;
+
+/**
+ * Modify keyboard configuration of 'auto-correction'.
+ *
+ * @param isEnabled Turn the configuration on if the value is YES
+ */
++ (void)setKeyboardAutocorrection:(BOOL)isEnabled;
++ (BOOL)keyboardAutocorrection;
+
+/**
+ * Modify keyboard configuration of 'predictive'
+ *
+ * @param isEnabled Turn the configuration on if the value is YES
+ */
++ (void)setKeyboardPrediction:(BOOL)isEnabled;
++ (BOOL)keyboardPrediction;
+
+/**
+ * The maximum time to wait until accessibility snapshot is taken
+ *
+ * @param timeout The number of float seconds to wait (15 seconds by default)
+ */
++ (void)setSnapshotTimeout:(NSTimeInterval)timeout;
++ (NSTimeInterval)snapshotTimeout;
+
+/**
+ * Whether to use fast search result matching while searching for elements.
+ * By default this is disabled due to https://github.com/appium/appium/issues/10101
+ * but it still makes sense to enable it for views containing large counts of elements
+ *
+ * @param enabled Either YES or NO
+ */
++ (void)setUseFirstMatch:(BOOL)enabled;
++ (BOOL)useFirstMatch;
+
+/**
+ * Modify reduce motion configuration in accessibility.
+ * It works only for Simulator since Real device has security model which allows chnaging preferences
+ * only from settings app.
+ *
+ * @param isEnabled Turn the configuration on if the value is YES
+ */
++ (void)setReduceMotionEnabled:(BOOL)isEnabled;
++ (BOOL)reduceMotionEnabled;
+
+/**
+ Enforces the page hierarchy to include non modal elements,
+ like Contacts. By default such elements are not present there.
+ See https://github.com/appium/appium/issues/13227
+
+ @param isEnabled Set to YES in order to enable non modal elements inclusion.
+ Setting this value to YES will have no effect if the current iOS SDK does not support such feature.
+ */
++ (void)setIncludeNonModalElements:(BOOL)isEnabled;
++ (BOOL)includeNonModalElements;
+
+/**
+ Sets custom class chain locators for accept/dismiss alert buttons location.
+ This might be useful if the default buttons detection algorithm fails to determine alert buttons properly
+ when defaultAlertAction is set.
+
+ @param classChainSelector Valid class chain locator, which determines accept/reject button
+ on the alert. The search root is the alert element itself.
+ Setting this value to nil or an empty string (the default
+ value) will enforce WDA to apply the default algorithm for alert buttons location.
+ If an invalid/non-parseable locator is set then the lookup will fallback to the default algorithm and print a
+ warning into the log.
+ Example: ** /XCUIElementTypeButton[`label CONTAINS[c] 'accept'`]
+ */
++ (void)setAcceptAlertButtonSelector:(NSString *)classChainSelector;
++ (NSString *)acceptAlertButtonSelector;
++ (void)setDismissAlertButtonSelector:(NSString *)classChainSelector;
++ (NSString *)dismissAlertButtonSelector;
 
 @end
 

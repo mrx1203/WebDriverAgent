@@ -15,6 +15,7 @@
 #import "FBMacros.h"
 #import "FBMathUtils.h"
 #import "FBXCTestDaemonsProxy.h"
+#import "FBProtocolHelpers.h"
 #import "XCUIElement+FBUtilities.h"
 #import "XCUIElement.h"
 #import "XCSynthesizedEventRecord.h"
@@ -35,13 +36,14 @@ static NSString *const FB_OPTION_COUNT = @"count";
 static NSString *const FB_OPTION_MS = @"ms";
 static NSString *const FB_OPTION_PRESSURE = @"pressure";
 
+static NSString *const FB_OPTIONS_KEY = @"options";
+
+#if !TARGET_OS_TV
 // Some useful constants might be found at
 // https://android.googlesource.com/platform/frameworks/base/+/master/core/java/android/view/ViewConfiguration.java
 static const double FB_TAP_DURATION_MS = 100.0;
 static const double FB_INTERTAP_MIN_DURATION_MS = 40.0;
 static const double FB_LONG_TAP_DURATION_MS = 600.0;
-static NSString *const FB_OPTIONS_KEY = @"options";
-static NSString *const FB_ELEMENT_KEY = @"element";
 
 @interface FBAppiumGestureItem : FBBaseGestureItem
 
@@ -127,11 +129,11 @@ static NSString *const FB_ELEMENT_KEY = @"element";
     }
     return nil;
   }
-  XCUIElement *element = [options objectForKey:FB_ELEMENT_KEY];
+  XCUIElement *element = FBExtractElement((id) options);
   NSNumber *x = [options objectForKey:@"x"];
   NSNumber *y = [options objectForKey:@"y"];
   if ((nil != x && nil == y) || (nil != y && nil == x) || (nil == x && nil == y && nil == element)) {
-    NSString *description = [NSString stringWithFormat:@"Either '%@' or 'x' and 'y' options should be set for '%@' action", FB_ELEMENT_KEY, self.class.actionName];
+    NSString *description = [NSString stringWithFormat:@"Either element or 'x' and 'y' options should be set for '%@' action", self.class.actionName];
     if (error) {
       *error = [[FBErrorBuilder.builder withDescription:description] build];
     }
@@ -385,7 +387,7 @@ static NSString *const FB_ELEMENT_KEY = @"element";
       [result addObject:touchItem];
       continue;
     }
-    NSString *uuid = [options objectForKey:FB_ELEMENT_KEY];
+    NSString *uuid = FBExtractElement(options);
     if (nil == uuid || nil == self.elementCache) {
       [result addObject:touchItem];
       continue;
@@ -396,9 +398,8 @@ static NSString *const FB_ELEMENT_KEY = @"element";
       continue;
     }
     NSMutableDictionary<NSString *, id> *processedItem = touchItem.mutableCopy;
-    NSMutableDictionary<NSString *, id> *processedOptions = ((NSDictionary *)[processedItem objectForKey:FB_OPTIONS_KEY]).mutableCopy;
-    [processedOptions setObject:element forKey:FB_ELEMENT_KEY];
-    [processedItem setObject:processedOptions.copy forKey:FB_OPTIONS_KEY];
+    [processedItem setObject:FBInsertElement(FBCleanupElements(options), element)
+                      forKey:FB_OPTIONS_KEY];
     [result addObject:processedItem.copy];
   }
   return [[result reverseObjectEnumerator] allObjects];
@@ -489,3 +490,4 @@ static NSString *const FB_ELEMENT_KEY = @"element";
 
 @end
 
+#endif

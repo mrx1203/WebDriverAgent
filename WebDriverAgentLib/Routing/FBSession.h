@@ -31,6 +31,8 @@ extern NSString *const FBApplicationCrashedException;
 /*! Element cache related to that session */
 @property (nonatomic, strong, readonly) FBElementCache *elementCache;
 
+@property (nonatomic, copy) NSString *defaultActiveApplication;
+
 + (nullable instancetype)activeSession;
 
 /**
@@ -48,7 +50,7 @@ extern NSString *const FBApplicationCrashedException;
  @param application The application that we want to create session for
  @return new session
  */
-+ (instancetype)sessionWithApplication:(nullable FBApplication *)application;
++ (instancetype)initWithApplication:(nullable FBApplication *)application;
 
 /**
  Creates and saves new session for application with default alert handling behaviour
@@ -57,7 +59,7 @@ extern NSString *const FBApplicationCrashedException;
  @param defaultAlertAction The default reaction to on-screen alert. Either 'accept' or 'dismiss'
  @return new session
  */
-+ (instancetype)sessionWithApplication:(nullable FBApplication *)application defaultAlertAction:(NSString *)defaultAlertAction;
++ (instancetype)initWithApplication:(nullable FBApplication *)application defaultAlertAction:(NSString *)defaultAlertAction;
 
 /**
  Kills application associated with that session and removes session

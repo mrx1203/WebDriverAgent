@@ -13,7 +13,6 @@
 
 #import "XCUIElement.h"
 #import "XCUIApplication+FBTouchAction.h"
-#import "FBAlert.h"
 #import "FBTestMacros.h"
 #import "XCUIDevice+FBRotation.h"
 #import "FBRunLoopSpinner.h"
@@ -33,7 +32,6 @@
 {
   [[XCUIDevice sharedDevice] fb_setDeviceInterfaceOrientation:orientation];
   NSError *error;
-  XCTAssertTrue(self.testedApplication.alerts.count == 0);
   XCTAssertTrue([self.testedApplication fb_performAppiumTouchActions:gesture elementCache:nil error:&error]);
   FBAssertWaitTillBecomesTrue(self.testedApplication.alerts.count > 0);
 }
@@ -46,12 +44,14 @@
     [self launchApplication];
     [self goToAlertsPage];
   });
+  [self clearAlert];
 }
 
 - (void)tearDown
 {
+  [self clearAlert];
+  [self resetOrientation];
   [super tearDown];
-  [[FBAlert alertWithApplication:self.testedApplication] dismissWithError:nil];
 }
 
 - (void)testErroneousGestures
@@ -75,7 +75,7 @@
     @[@{
         @"action": @"moveTo",
         @"options": @{
-            @"element": dstButton,
+            @"ELEMENT": dstButton,
             }
         },
       @{
@@ -87,7 +87,7 @@
     @[@{
         @"action": @"tapP",
         @"options": @{
-            @"element": dstButton,
+            @"ELEMENT": dstButton,
             }
         },
       ],
@@ -168,7 +168,7 @@
   @[@{
       @"action": @"tap",
       @"options": @{
-          @"element": self.testedApplication.buttons[FBShowAlertButtonName]
+          @"ELEMENT": self.testedApplication.buttons[FBShowAlertButtonName]
           }
       }
   ];
@@ -198,7 +198,7 @@
   @[@{
       @"action": @"tap",
       @"options": @{
-          @"element": self.testedApplication.buttons[FBShowAlertButtonName],
+          @"ELEMENT": self.testedApplication.buttons[FBShowAlertButtonName],
           @"count": @2
           }
       },
@@ -212,7 +212,7 @@
   @[@{
       @"action": @"press",
       @"options": @{
-          @"element": self.testedApplication.buttons[FBShowAlertButtonName],
+          @"ELEMENT": self.testedApplication.buttons[FBShowAlertButtonName],
           @"x": @1,
           @"y": @1
           }
@@ -275,7 +275,7 @@
   @[@{
       @"action": @"press",
       @"options": @{
-          @"element": self.testedApplication.buttons[FBShowAlertForceTouchButtonName],
+          @"ELEMENT": self.testedApplication.buttons[FBShowAlertForceTouchButtonName],
           @"x": @1,
           @"y": @1,
           @"pressure": @1
@@ -312,6 +312,7 @@
 
 - (void)tearDown
 {
+  [self resetOrientation];
   [super tearDown];
 }
 
@@ -325,7 +326,7 @@
                    timeout:2.0]
                   timeoutErrorMessage:@"Picker wheel value has not been changed after 2 seconds timeout"]
                  spinUntilTrue:^BOOL{
-                   [self.pickerWheel resolve];
+                   [self.pickerWheel fb_nativeResolve];
                    return ![self.pickerWheel.value isEqualToString:previousValue];
                  }
                  error:&error]);
@@ -339,7 +340,7 @@
   @[@{
       @"action": @"press",
       @"options": @{
-          @"element": self.pickerWheel,
+          @"ELEMENT": self.pickerWheel,
           @"x": @(pickerFrame.size.width / 2),
           @"y": @(pickerFrame.size.height / 2),
           }
@@ -353,7 +354,7 @@
     @{
       @"action": @"moveTo",
       @"options": @{
-          @"element": self.pickerWheel,
+          @"ELEMENT": self.pickerWheel,
           @"x": @(pickerFrame.size.width / 2),
           @"y": @(pickerFrame.size.height),
           }
@@ -372,7 +373,7 @@
   @[@{
       @"action": @"press",
       @"options": @{
-          @"element": self.pickerWheel,
+          @"ELEMENT": self.pickerWheel,
           @"x": @(pickerFrame.size.width / 2),
           @"y": @(pickerFrame.size.height / 2),
           }
