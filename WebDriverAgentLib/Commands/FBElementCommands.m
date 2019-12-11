@@ -39,6 +39,7 @@
 #import "XCUIElement.h"
 #import "XCUIElementQuery.h"
 #import "FBXCodeCompatibility.h"
+#import "XCUIApplication+FBTouchAction.h"
 
 @interface FBElementCommands ()
 @end
