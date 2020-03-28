@@ -34,10 +34,15 @@
 
 + (id<FBResponsePayload>)handlePerformAppiumTouchActions:(FBRouteRequest *)request
 {
-  XCUIApplication *application = [FBApplication fb_activeApplication];//request.session.activeApplication;
+  XCUIApplication *application = [FBApplication fb_activeApplication];
+  FBElementCache *elementCache = nil;
+  if(request.session){
+    application = request.session.activeApplication;
+    elementCache = request.session.elementCache;
+  }
   NSArray *actions = (NSArray *)request.arguments[@"actions"];
   NSError *error;
-  if (![application fb_performAppiumTouchActions:actions elementCache:request.session.elementCache error:&error]) {
+  if (![application fb_performAppiumTouchActions:actions elementCache:elementCache error:&error]) {
     return FBResponseWithUnknownError(error);
   }
   return FBResponseWithOK();

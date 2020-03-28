@@ -40,6 +40,7 @@
 #import "XCUIElementQuery.h"
 #import "FBXCodeCompatibility.h"
 #import "XCUIApplication+FBTouchAction.h"
+//#import "XCEventGenerator.h"
 
 @interface FBElementCommands ()
 @end
@@ -103,48 +104,63 @@
 
 + (id<FBResponsePayload>)handleTap_stf:(FBRouteRequest *)request
 {
-   XCUIApplication* application = FBApplication.fb_activeApplication;
-   CGPoint tapPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
-   NSTimeInterval duration = [request.arguments[@"duration"] doubleValue];
-   XCUIElement *element = application.windows.fb_firstMatch;
-   
-   if(isSDKVersionLessThan(@"11.0")){
-     CGSize frameSize = application.frame.size;
-     UIInterfaceOrientation orientation = application.interfaceOrientation;
-     tapPoint = FBInvertPointForApplication(tapPoint, frameSize, orientation);
-   }
-   if(duration>0.5 || SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"13.0")){
-     XCUICoordinate *appCoordinate = [[XCUICoordinate alloc] initWithElement:element normalizedOffset:CGVectorMake(0, 0)];
-     XCUICoordinate *tapCoordinate  = [[XCUICoordinate alloc] initWithCoordinate:appCoordinate pointsOffset:CGVectorMake(tapPoint.x, tapPoint.y)];
-     if(duration>0.5){
-        [tapCoordinate pressForDuration:duration];
-     }
-     else{
-        [tapCoordinate tap];
-     }
-   } else {
+  /*CGPoint tapPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
+  double duration = [request.arguments[@"duration"] doubleValue];
+  NSLog(@"x=%@ y=%@ duration=%@",request.arguments[@"x"],request.arguments[@"y"],request.arguments[@"duration"]);
+  [[XCEventGenerator sharedGenerator] pressAtPoint:tapPoint forDuration:duration orientation:0 handler:^(XCSynthesizedEventRecord *record, NSError *error) {} ];
+  return FBResponseWithOK();*/
+  XCUIApplication* application = FBApplication.fb_activeApplication;
+  CGPoint tapPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
+  NSTimeInterval duration = [request.arguments[@"duration"] doubleValue];
+  XCUIElement *element = application.windows.fb_firstMatch;
+  
+  if(isSDKVersionLessThan(@"11.0")){
+    CGSize frameSize = application.frame.size;
+    UIInterfaceOrientation orientation = application.interfaceOrientation;
+    tapPoint = FBInvertPointForApplication(tapPoint, frameSize, orientation);
+  }
+  if(duration>0.5 || SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"13.0")){
+    XCUICoordinate *appCoordinate = [[XCUICoordinate alloc] initWithElement:element normalizedOffset:CGVectorMake(0, 0)];
+    XCUICoordinate *tapCoordinate  = [[XCUICoordinate alloc] initWithCoordinate:appCoordinate pointsOffset:CGVectorMake(tapPoint.x, tapPoint.y)];
+    if(duration>0.5){
+       [tapCoordinate pressForDuration:duration];
+    }
+    else{
+       [tapCoordinate tap];
+    }
+  } else {
     NSArray<NSDictionary<NSString *, id> *> *tapGesture =
     @[
-        @{@"action": @"tap",
-          @"options": @{
-            @"element": element,
-            @"x": @(tapPoint.x),
-            @"y": @(tapPoint.y)
-            }
-        }
+       @{@"action": @"tap",
+         @"options": @{
+           @"element": element,
+           @"x": @(tapPoint.x),
+           @"y": @(tapPoint.y)
+           }
+       }
     ];
     [application fb_performAppiumTouchActions:tapGesture elementCache:nil error:nil];
-   }
-   return FBResponseWithOK();
+  }
+  return FBResponseWithOK();
 }
 
 + (id<FBResponsePayload>)handleDragCoordinate_stf:(FBRouteRequest *)request
 {
+  /*CGPoint startPoint = CGPointMake((CGFloat)[request.arguments[@"fromX"] doubleValue], (CGFloat)[request.arguments[@"fromY"] doubleValue]);
+  CGPoint endPoint = CGPointMake((CGFloat)[request.arguments[@"toX"] doubleValue], (CGFloat)[request.arguments[@"toY"] doubleValue]);
+  NSTimeInterval duration = [request.arguments[@"duration"] doubleValue];
+  
+  NSLog(@"fromX=%@ fromY=%@ toX=%@ toY=%@ duration=%@",request.arguments[@"fromX"],request.arguments[@"fromY"],
+        request.arguments[@"toX"],request.arguments[@"toY"],request.arguments[@"duration"]);
+  [[XCEventGenerator sharedGenerator] pressAtPoint:startPoint forDuration:duration liftAtPoint:endPoint velocity:500 orientation:0 name:@"drag" handler:^(XCSynthesizedEventRecord *record,NSError *error){}];
+  return FBResponseWithOK();*/
+  
   XCUIApplication* application = FBApplication.fb_activeApplication;
   CGPoint startPoint = CGPointMake((CGFloat)[request.arguments[@"fromX"] doubleValue], (CGFloat)[request.arguments[@"fromY"] doubleValue]);
   CGPoint endPoint = CGPointMake((CGFloat)[request.arguments[@"toX"] doubleValue], (CGFloat)[request.arguments[@"toY"] doubleValue]);
   NSTimeInterval duration = [request.arguments[@"duration"] doubleValue];
 
+  
   CGSize frameSize = application.frame.size;
   UIInterfaceOrientation orientation = application.interfaceOrientation;
   if(isSDKVersionLessThan(@"11.0")){
@@ -613,7 +629,7 @@
 
 + (id<FBResponsePayload>)handleKeys:(FBRouteRequest *)request
 {
-  NSString *textToType = [request.arguments[@"value"] componentsJoinedByString:@""];
+  NSString *textToType = request.arguments[@"value"];
   NSUInteger frequency = [request.arguments[@"frequency"] unsignedIntegerValue] ?: [FBConfiguration maxTypingFrequency];
   NSError *error;
   if (![FBKeyboard typeText:textToType frequency:frequency error:&error]) {

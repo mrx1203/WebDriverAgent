@@ -25,10 +25,15 @@
     return YES;
   }
 
+  CGRect frame = self.frame;
   NSArray<NSDictionary<NSString *, id> *> *tapGesture =
   @[
     @{@"action": @"tap",
-      @"options": @{@"element": self}
+      @"options": @{
+          @"element": self,
+          @"x":@(frame.origin.x+frame.size.width/2),
+          @"y":@(frame.origin.y+frame.size.height/2)
+        }
       }
     ];
   [self fb_waitUntilFrameIsStable];

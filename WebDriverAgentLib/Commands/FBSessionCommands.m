@@ -99,15 +99,18 @@ static NSString* const DISMISS_ALERT_BUTTON_SELECTOR = @"dismissAlertButtonSelec
   NSString *appPath = requirements[@"app"];
   if (!bundleID) {
     return FBResponseWithStatus([FBCommandStatus invalidArgumentErrorWithMessage:@"bundleId is required" traceback:nil]);
-    }
+  }
   
   [FBConfiguration setShouldWaitForQuiescence:[requirements[@"shouldWaitForQuiescence"] boolValue]];
   FBApplication *app = [[FBApplication alloc] initPrivateWithPath:appPath bundleID:bundleID];
-  app.fb_shouldWaitForQuiescence = FBConfiguration.shouldWaitForQuiescence;
-  app.launchArguments = (NSArray<NSString *> *)requirements[@"arguments"] ?: @[];
-  app.launchEnvironment = (NSDictionary <NSString *, NSString *> *)requirements[@"environment"] ?: @{};
-  [app launch];
-  
+  if (app.fb_state < 2) {
+    app.fb_shouldWaitForQuiescence = FBConfiguration.shouldWaitForQuiescence;
+    app.launchArguments = (NSArray<NSString *> *)requirements[@"arguments"] ?: @[];
+    app.launchEnvironment =  @{};//(NSDictionary <NSString *, NSString *> *)requirements[@"environment"] ?: @{};
+    [app launch];
+  } else {
+    [app fb_activate];
+  }
   if (app.processID == 0) {
     return FBResponseWithUnknownErrorFormat(@"Failed to launch %@ application", bundleID);
   }
@@ -129,13 +132,13 @@ static NSString* const DISMISS_ALERT_BUTTON_SELECTOR = @"dismissAlertButtonSelec
 
 + (id<FBResponsePayload>)handleCreateSession:(FBRouteRequest *)request
 {
-  NSDictionary<NSString *, id> *requirements;
+  NSDictionary *requirements = request.arguments[@"capabilities"];
   NSError *error;
   if (![request.arguments[@"capabilities"] isKindOfClass:NSDictionary.class]) {
     return FBResponseWithStatus([FBCommandStatus sessionNotCreatedError:@"'capabilities' is mandatory to create a new session"
                                                               traceback:nil]);
   }
-  if (nil == (requirements = FBParseCapabilities((NSDictionary *)request.arguments[@"capabilities"], &error))) {
+  if (nil == (requirements = FBParseCapabilities(requirements, &error))) {
     return FBResponseWithStatus([FBCommandStatus sessionNotCreatedError:error.description traceback:nil]);
   }
   [FBConfiguration setShouldUseTestManagerForVisibilityDetection:[requirements[@"shouldUseTestManagerForVisibilityDetection"] boolValue]];
@@ -177,7 +180,7 @@ static NSString* const DISMISS_ALERT_BUTTON_SELECTOR = @"dismissAlertButtonSelec
 
   if (requirements[@"defaultAlertAction"]) {
     [FBSession initWithApplication:app
-                defaultAlertAction:(id)requirements[@"defaultAlertAction"]];
+              defaultAlertAction:(id)requirements[@"defaultAlertAction"]];
   } else {
     [FBSession initWithApplication:app];
   }

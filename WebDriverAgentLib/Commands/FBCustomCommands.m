@@ -30,6 +30,9 @@
 #import "XCUIElementQuery.h"
 #import "FBUnattachedAppLauncher.h"
 
+//#import <dlfcn.h>
+//#include <CoreTelephony/CTCellularData.h>
+
 @implementation FBCustomCommands
 
 + (NSArray *)routes
@@ -58,6 +61,7 @@
     [[FBRoute POST:@"/wda/siri/activate"] respondWithTarget:self action:@selector(handleActivateSiri:)],
     [[FBRoute POST:@"/wda/apps/launchUnattached"].withoutSession respondWithTarget:self action:@selector(handleLaunchUnattachedApp:)],
     [[FBRoute GET:@"/wda/device/info"] respondWithTarget:self action:@selector(handleGetDeviceInfo:)],
+    //[[FBRoute GET:@"/wda/getWeaknetInfo"].withoutSession respondWithTarget:self action:@selector(handleGetWeakNetInfo:)],
   ];
 }
 
@@ -328,5 +332,78 @@
 
   return [localTimeZone name];
 }
+
+/*+ (id<FBResponsePayload>)handleGetWeakNetInfo:(FBRouteRequest *)request
+{
+  
+  void * FTServicesHandle = dlopen("/System/Library/PrivateFrameworks/FTServices.framework/FTServices", RTLD_LAZY);
+  Class NetworkSupport = NSClassFromString(@"FTNetworkSupport");
+  
+#       pragma clang diagnostic push
+#       pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+  id networkSupport = [NetworkSupport performSelector:NSSelectorFromString(@"sharedInstance")];
+  [networkSupport performSelector:NSSelectorFromString(@"dataActiveAndReachable")];
+#       pragma clang diagnostic pop
+  
+
+  
+  CTCellularData *cellularData = [[CTCellularData alloc] init];
+  cellularData.cellularDataRestrictionDidUpdateNotifier = ^(CTCellularDataRestrictedState state) {
+    switch (state) {
+      case kCTCellularDataRestricted:
+        NSLog(@"Restricted");
+        //2.1权限关闭的情况下 再次请求网络数据会弹出设置网络提示
+        //        [self getAppInfo];
+        break;
+      case kCTCellularDataRestrictedStateUnknown:
+        NSLog(@"Unknown");
+        //2.2未知情况 （还没有遇到推测是有网络但是连接不正常的情况下）
+        //        [self getAppInfo];
+        break;
+      case kCTCellularDataNotRestricted:
+        NSLog(@"NotRestricted");
+        //2.3已经开启网络权限 监听网络状态
+        //卸载FTServices.framework
+        dlclose(FTServicesHandle);
+        break;
+      default:
+        break;
+    }
+  };
+  
+  void *CoreTelephonyHandle = dlopen("/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony", RTLD_LAZY);
+  //用函数指针来调用私有C函数，用符号名从库里寻找函数地址
+  CFTypeRef (*connectionCreateOnTargetQueue)(CFAllocatorRef, NSString *, dispatch_queue_t, void*) = (CFTypeRef (*)(CFAllocatorRef, NSString *, dispatch_queue_t, void*))dlsym(CoreTelephonyHandle, "_CTServerConnectionCreateOnTargetQueue");
+  int (*changeCellularPolicy)(CFTypeRef, NSString *, NSDictionary *) = (int (*)(CFTypeRef, NSString *, NSDictionary *))dlsym(CoreTelephonyHandle, "_CTServerConnectionSetCellularUsagePolicy");
+  //使用设置app的bundle id进行伪装
+  CFTypeRef connection = connectionCreateOnTargetQueue(kCFAllocatorDefault,@"com.apple.Preferences",dispatch_get_main_queue(),NULL);
+  //请求修改本app的网络权限为allowed，不会真的修改，只能触发系统更新一下相关的数据
+  changeCellularPolicy(connection, @"com.apple.test.WebDriverAgentRunner-Runner", @{@"kCTCellularUsagePolicyDataAllowed":@YES});
+  dlclose(CoreTelephonyHandle);
+  
+  dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+  NSURL *url =[NSURL URLWithString:@"http://172.21.37.124:8000/api/v1/token"];
+  NSURLSession *session =[NSURLSession sharedSession];
+  __block NSString *err = @"no error";
+  __block NSString *res;
+  
+  NSURLSessionDataTask *dataTask =[session dataTaskWithURL:url completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
+    NSString *retStr = [[NSString alloc] initWithData:(NSData*)data encoding:NSUTF8StringEncoding];
+    res = retStr;
+    if (error != nil) {
+      err = [error localizedDescription];
+    }
+    //    NSLog(@"html = %@",retStr);
+    dispatch_semaphore_signal(semaphore);
+  }];
+  [dataTask resume];
+  dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+  
+  return FBResponseWithObject(@{
+                                @"info":res,
+                                @"error":err
+                              });
+}*/
+
 
 @end

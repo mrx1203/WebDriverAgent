@@ -89,11 +89,13 @@ static const double FB_LONG_TAP_DURATION_MS = 600.0;
     if (atPosition) {
       self.atPosition = [atPosition CGPointValue];
     } else {
-      NSValue *result = [self coordinatesWithOptions:options error:error];
-      if (nil == result) {
-        return nil;
-      }
-      self.atPosition = [result CGPointValue];
+//      NSValue *result = [self coordinatesWithOptions:options error:error];
+//      if (nil == result) {
+//        return nil;
+//      }
+      NSNumber *x = [options objectForKey:@"x"];
+      NSNumber *y = [options objectForKey:@"y"];
+      self.atPosition = CGPointMake(x.floatValue, y.floatValue);
     }
     self.duration = [self durationWithOptions:options];
     if (self.duration < 0) {
