@@ -11,6 +11,7 @@
 set -e
 
 export PATH=$PATH:/usr/local/bin
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 BOLD="\033[1m"
 
 if [[ ! -f Scripts/bootstrap.sh ]]; then
@@ -57,18 +58,20 @@ function fetch_and_build_dependencies() {
       echo "tvOS platform will not be included into Carthage bootstrap, because no Simulator devices have been created for it"
     fi
     platform_str=$(join_by , "${platforms[@]}")
-    carthage bootstrap $USE_SSH --platform "$platform_str"
+    bash "$DIR/carthage-wrapper.sh" bootstrap $USE_SSH --platform "$platform_str" $NO_USE_BINARIES
     cp Cartfile.resolved Carthage
+  else
+    echo "Dependencies up-to-date"
   fi
-
 }
 
 FETCH_DEPS=1
 
-while getopts " d D h " option; do
+while getopts " d D h n" option; do
   case "$option" in
     d ) FETCH_DEPS=1;;
     D ) FETCH_DEPS=1; USE_SSH="--use-ssh";;
+    n ) NO_USE_BINARIES="--no-use-binaries";;
     h ) print_usage; exit 1;;
     *) exit 1 ;;
   esac

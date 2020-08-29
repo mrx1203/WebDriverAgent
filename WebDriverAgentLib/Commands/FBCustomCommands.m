@@ -62,6 +62,8 @@
     [[FBRoute POST:@"/wda/apps/launchUnattached"].withoutSession respondWithTarget:self action:@selector(handleLaunchUnattachedApp:)],
     [[FBRoute GET:@"/wda/device/info"] respondWithTarget:self action:@selector(handleGetDeviceInfo:)],
     //[[FBRoute GET:@"/wda/getWeaknetInfo"].withoutSession respondWithTarget:self action:@selector(handleGetWeakNetInfo:)],
+    [[FBRoute GET:@"/wda/device/info"].withoutSession respondWithTarget:self action:@selector(handleGetDeviceInfo:)],
+    [[FBRoute OPTIONS:@"/*"].withoutSession respondWithTarget:self action:@selector(handlePingCommand:)],
   ];
 }
 
@@ -123,6 +125,11 @@
   return FBResponseWithOK();
 }
 
++ (id<FBResponsePayload>)handlePingCommand:(FBRouteRequest *)request
+{
+  return FBResponseWithOK();
+}
+
 #pragma mark - Helpers
 
 + (BOOL)isKeyboardPresentForApplication:(XCUIApplication *)application {
@@ -160,6 +167,7 @@
       @"isLocked":isLocked ? @YES : @NO,
       @"func":@"locked"
   });
+  //return FBResponseWithObject(isLocked ? @YES : @NO);
 }
 
 + (id<FBResponsePayload>)handleUnlock:(FBRouteRequest *)request
@@ -246,6 +254,7 @@
     @"content":[result base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength],
     @"func":@"getPasteboard"
   });
+  //return FBResponseWithObject([result base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength]);
 }
 
 + (id<FBResponsePayload>)handleGetBatteryInfo:(FBRouteRequest *)request
@@ -303,12 +312,43 @@
     @"uuid": [UIDevice.currentDevice.identifierForVendor UUIDString] ?: @"unknown",
     // https://developer.apple.com/documentation/uikit/uiuserinterfaceidiom?language=objc
     @"userInterfaceIdiom": @(UIDevice.currentDevice.userInterfaceIdiom),
+    @"userInterfaceStyle": self.userInterfaceStyle,
 #if TARGET_OS_SIMULATOR
     @"isSimulator": @(YES),
 #else
     @"isSimulator": @(NO),
 #endif
   });
+}
+
+/**
+ * @return Current user interface style as a string
+ */
++ (NSString *)userInterfaceStyle
+{
+  static id userInterfaceStyle = nil;
+  static dispatch_once_t styleOnceToken;
+  dispatch_once(&styleOnceToken, ^{
+    if ([UITraitCollection respondsToSelector:NSSelectorFromString(@"currentTraitCollection")]) {
+      id currentTraitCollection = [UITraitCollection performSelector:NSSelectorFromString(@"currentTraitCollection")];
+      if (nil != currentTraitCollection) {
+        userInterfaceStyle = [currentTraitCollection valueForKey:@"userInterfaceStyle"];
+      }
+    }
+  });
+
+  if (nil == userInterfaceStyle) {
+    return @"unsupported";
+  }
+
+  switch ([userInterfaceStyle integerValue]) {
+    case 1: // UIUserInterfaceStyleLight
+      return @"light";
+    case 2: // UIUserInterfaceStyleDark
+      return @"dark";
+    default:
+      return @"unknown";
+  }
 }
 
 /**
@@ -404,6 +444,5 @@
                                 @"error":err
                               });
 }*/
-
 
 @end

@@ -1,14 +1,25 @@
 import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
+<<<<<<< HEAD
 import { createDevice, deleteDevice } from 'node-simctl';
 import { getVersion } from 'appium-xcode';
 import { getSimulator } from 'appium-ios-simulator';
 import { killAllSimulators, shutdownSimulator } from './helpers/simulator';
 import request from 'request-promise';
+=======
+import Simctl from 'node-simctl';
+import { getVersion } from 'appium-xcode';
+import { getSimulator } from 'appium-ios-simulator';
+import { killAllSimulators, shutdownSimulator } from './helpers/simulator';
+>>>>>>> appium
 import { SubProcess } from 'teen_process';
 import { PLATFORM_VERSION, DEVICE_NAME } from './desired';
 import { retryInterval } from 'asyncbox';
 import { WebDriverAgent } from '../..';
+<<<<<<< HEAD
+=======
+import axios from 'axios';
+>>>>>>> appium
 
 
 const SIM_DEVICE_NAME = 'webDriverAgentTest';
@@ -26,7 +37,13 @@ function getStartOpts (device) {
     platformVersion: PLATFORM_VERSION,
     host: 'localhost',
     port: 8100,
+<<<<<<< HEAD
     realDevice: false
+=======
+    realDevice: false,
+    showXcodeLog: true,
+    wdaLaunchTimeout: 60 * 3 * 1000,
+>>>>>>> appium
   };
 }
 
@@ -45,13 +62,25 @@ describe('WebDriverAgent', function () {
   });
   describe('with fresh sim', function () {
     let device;
+<<<<<<< HEAD
     before(async function () {
       let simUdid = await createDevice(
+=======
+    let simctl;
+
+    before(async function () {
+      simctl = new Simctl();
+      simctl.udid = await simctl.createDevice(
+>>>>>>> appium
         SIM_DEVICE_NAME,
         DEVICE_NAME,
         PLATFORM_VERSION
       );
+<<<<<<< HEAD
       device = await getSimulator(simUdid);
+=======
+      device = await getSimulator(simctl.udid);
+>>>>>>> appium
     });
 
     after(async function () {
@@ -59,7 +88,11 @@ describe('WebDriverAgent', function () {
 
       await shutdownSimulator(device);
 
+<<<<<<< HEAD
       await deleteDevice(device.udid);
+=======
+      await simctl.deleteDevice();
+>>>>>>> appium
     });
 
     describe('with running sim', function () {
@@ -80,7 +113,11 @@ describe('WebDriverAgent', function () {
         const agent = new WebDriverAgent(xcodeVersion, getStartOpts(device));
 
         await agent.launch('sessionId');
+<<<<<<< HEAD
         await request(testUrl).should.be.eventually.rejectedWith(/unknown command/);
+=======
+        await axios({url: testUrl}).should.be.eventually.rejected;
+>>>>>>> appium
         await agent.quit();
       });
 

@@ -49,6 +49,11 @@
   return @"test";
 }
 
+- (id)fb_cachedSnapshot
+{
+  return nil;
+}
+
 - (void)resolve
 {
   self.didResolve = YES;
@@ -57,6 +62,11 @@
 - (id)lastSnapshot
 {
   return self;
+}
+
+- (id)fb_uid
+{
+  return self.wdUID;
 }
 
 @end

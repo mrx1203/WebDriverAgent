@@ -4,11 +4,13 @@ import chaiAsPromised from 'chai-as-promised';
 import * as teen_process from 'teen_process';
 import { withMocks } from 'appium-test-support';
 import { fs } from 'appium-support';
+import Simctl from 'node-simctl';
 import * as utils from '../lib/utils';
 
 
 chai.should();
 chai.use(chaiAsPromised);
+const simctl = Simctl.prototype;
 
 
 function mockPassingResourceCreation (mocks) {
@@ -23,19 +25,19 @@ function mockPassingResourceCreation (mocks) {
 
 function mockSkippingCarthageRun (mocks) {
   mocks.fs.expects('which').once().returns(true);
-  mocks.utils.expects('fileCompare').once()
+  mocks.utils.expects('areFilesEqual').once()
     .onFirstCall().returns(true);
   mocks.teen_process.expects('exec').never();
 }
 
 describe('webdriveragent utils', function () {
-  describe('checkForDependencies', withMocks({teen_process, fs, utils}, (mocks) => {
+  describe('checkForDependencies', withMocks({teen_process, fs, utils, simctl}, (mocks) => {
     afterEach(function () {
       mocks.verify();
     });
     it('should not run script if Carthage directory already present', async function () {
       mocks.fs.expects('which').once().returns(true);
-      mocks.utils.expects('fileCompare').once()
+      mocks.utils.expects('areFilesEqual').once()
         .onFirstCall().returns(true);
       mocks.teen_process.expects('exec').never();
 
@@ -45,11 +47,10 @@ describe('webdriveragent utils', function () {
     });
     it('should delete Carthage folder and throw error on script error', async function () {
       mocks.fs.expects('which').once().returns(true);
-      mocks.utils.expects('fileCompare').once()
+      mocks.utils.expects('areFilesEqual').once()
         .onFirstCall().returns(false);
-      mocks.teen_process.expects('exec')
-        .once().withArgs('xcrun', ['simctl', 'list', 'devices', '-j'])
-        .returns({stdout: `{"devices" : {}}`});
+      mocks.simctl.expects('getDevices')
+        .once().returns([]);
       mocks.teen_process.expects('exec')
         .once().withArgs('carthage', ['bootstrap', '--platform', 'iOS'])
         .throws({stdout: '', stderr: '', message: 'Carthage failure'});

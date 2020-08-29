@@ -1,10 +1,17 @@
 const path = require('path');
+<<<<<<< HEAD
 const request = require('request-promise');
 const requestCallback = require('request');
 const { asyncify } = require('asyncbox');
 const { logger, fs, mkdirp } = require('appium-support');
 const _ = require('lodash');
 const _fs = require('fs');
+=======
+const axios = require('axios');
+const { asyncify } = require('asyncbox');
+const { logger, fs, mkdirp, net } = require('appium-support');
+const _ = require('lodash');
+>>>>>>> appium
 const B = require('bluebird');
 
 const log = logger.getLogger('WDA');
@@ -16,6 +23,7 @@ async function fetchPrebuiltWebDriverAgentAssets () {
   log.info(`Getting WDA release ${downloadUrl}`);
   let releases;
   try {
+<<<<<<< HEAD
     releases = await request.get(downloadUrl, {
       headers: {
         'user-agent': 'appium',
@@ -24,6 +32,17 @@ async function fetchPrebuiltWebDriverAgentAssets () {
     });
   } catch (e) {
     throw new Error(`Could not fetch endpoint '${downloadUrl}. Reason: ${e.message}'`);
+=======
+    releases = (await axios({
+      url: downloadUrl,
+      headers: {
+        'user-agent': 'appium',
+        'accept': 'application/json, */*',
+      },
+    })).data;
+  } catch (e) {
+    throw new Error(`Could not fetch endpoint ${downloadUrl}. Reason: ${e.message}`);
+>>>>>>> appium
   }
 
   const webdriveragentsDir = path.resolve(__dirname, '..', 'prebuilt-agents');
@@ -34,6 +53,7 @@ async function fetchPrebuiltWebDriverAgentAssets () {
   // Define a method that does a streaming download of an asset
   async function downloadAgent (url, targetPath) {
     try {
+<<<<<<< HEAD
       // don't use request-promise here, we need streams
       return await new B((resolve, reject) => {
         requestCallback(url)
@@ -47,6 +67,9 @@ async function fetchPrebuiltWebDriverAgentAssets () {
           .pipe(_fs.createWriteStream(targetPath))
           .on('close', resolve);
       });
+=======
+      await net.downloadFile(url, targetPath);
+>>>>>>> appium
     } catch (err) {
       throw new Error(`Problem downloading webdriveragent from url ${url}: ${err.message}`);
     }

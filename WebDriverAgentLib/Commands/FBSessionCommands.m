@@ -35,13 +35,16 @@ static NSString* const SCREENSHOT_QUALITY = @"screenshotQuality";
 static NSString* const KEYBOARD_AUTOCORRECTION = @"keyboardAutocorrection";
 static NSString* const KEYBOARD_PREDICTION = @"keyboardPrediction";
 static NSString* const SNAPSHOT_TIMEOUT = @"snapshotTimeout";
+static NSString* const SNAPSHOT_MAX_DEPTH = @"snapshotMaxDepth";
 static NSString* const USE_FIRST_MATCH = @"useFirstMatch";
+static NSString* const BOUND_ELEMENTS_BY_INDEX = @"boundElementsByIndex";
 static NSString* const REDUCE_MOTION = @"reduceMotion";
 static NSString* const DEFAULT_ACTIVE_APPLICATION = @"defaultActiveApplication";
 static NSString* const ACTIVE_APP_DETECTION_POINT = @"activeAppDetectionPoint";
 static NSString* const INCLUDE_NON_MODAL_ELEMENTS = @"includeNonModalElements";
 static NSString* const ACCEPT_ALERT_BUTTON_SELECTOR = @"acceptAlertButtonSelector";
 static NSString* const DISMISS_ALERT_BUTTON_SELECTOR = @"dismissAlertButtonSelector";
+static NSString* const SCREENSHOT_ORIENTATION = @"screenshotOrientation";
 
 
 @implementation FBSessionCommands
@@ -259,10 +262,13 @@ static NSString* const DISMISS_ALERT_BUTTON_SELECTOR = @"dismissAlertButtonSelec
           @"name" : [[UIDevice currentDevice] systemName],
           @"version" : [[UIDevice currentDevice] systemVersion],
           @"sdkVersion": FBSDKVersion() ?: @"unknown",
+          @"testmanagerdVersion": @([XCUIApplication fb_testmanagerdVersion]),
         },
       @"ios" :
         @{
+#if TARGET_OS_SIMULATOR
           @"simulatorVersion" : [[UIDevice currentDevice] systemVersion],
+#endif
           @"ip" : [XCUIDevice sharedDevice].fb_wifiIPAddress ?: [NSNull null]
         },
       @"build" : buildInfo.copy,
@@ -296,13 +302,18 @@ static NSString* const DISMISS_ALERT_BUTTON_SELECTOR = @"dismissAlertButtonSelec
       KEYBOARD_AUTOCORRECTION: @([FBConfiguration keyboardAutocorrection]),
       KEYBOARD_PREDICTION: @([FBConfiguration keyboardPrediction]),
       SNAPSHOT_TIMEOUT: @([FBConfiguration snapshotTimeout]),
+      SNAPSHOT_MAX_DEPTH: @([FBConfiguration snapshotMaxDepth]),
       USE_FIRST_MATCH: @([FBConfiguration useFirstMatch]),
+      BOUND_ELEMENTS_BY_INDEX: @([FBConfiguration boundElementsByIndex]),
       REDUCE_MOTION: @([FBConfiguration reduceMotionEnabled]),
       DEFAULT_ACTIVE_APPLICATION: request.session.defaultActiveApplication,
       ACTIVE_APP_DETECTION_POINT: FBActiveAppDetectionPoint.sharedInstance.stringCoordinates,
       INCLUDE_NON_MODAL_ELEMENTS: @([FBConfiguration includeNonModalElements]),
       ACCEPT_ALERT_BUTTON_SELECTOR: FBConfiguration.acceptAlertButtonSelector,
       DISMISS_ALERT_BUTTON_SELECTOR: FBConfiguration.dismissAlertButtonSelector,
+#if !TARGET_OS_TV
+      SCREENSHOT_ORIENTATION: [FBConfiguration humanReadableScreenshotOrientation],
+#endif
     }
   );
 }
@@ -340,8 +351,14 @@ static NSString* const DISMISS_ALERT_BUTTON_SELECTOR = @"dismissAlertButtonSelec
   if (nil != [settings objectForKey:SNAPSHOT_TIMEOUT]) {
     [FBConfiguration setSnapshotTimeout:[[settings objectForKey:SNAPSHOT_TIMEOUT] doubleValue]];
   }
+  if (nil != [settings objectForKey:SNAPSHOT_MAX_DEPTH]) {
+    [FBConfiguration setSnapshotMaxDepth:[[settings objectForKey:SNAPSHOT_MAX_DEPTH] intValue]];
+  }
   if (nil != [settings objectForKey:USE_FIRST_MATCH]) {
     [FBConfiguration setUseFirstMatch:[[settings objectForKey:USE_FIRST_MATCH] boolValue]];
+  }
+  if (nil != [settings objectForKey:BOUND_ELEMENTS_BY_INDEX]) {
+    [FBConfiguration setBoundElementsByIndex:[[settings objectForKey:BOUND_ELEMENTS_BY_INDEX] boolValue]];
   }
   if (nil != [settings objectForKey:REDUCE_MOTION]) {
     [FBConfiguration setReduceMotionEnabled:[[settings objectForKey:REDUCE_MOTION] boolValue]];
@@ -369,6 +386,18 @@ static NSString* const DISMISS_ALERT_BUTTON_SELECTOR = @"dismissAlertButtonSelec
   if (nil != [settings objectForKey:DISMISS_ALERT_BUTTON_SELECTOR]) {
     [FBConfiguration setDismissAlertButtonSelector:(NSString *)[settings objectForKey:DISMISS_ALERT_BUTTON_SELECTOR]];
   }
+
+#if !TARGET_OS_TV
+  if (nil != [settings objectForKey:SCREENSHOT_ORIENTATION]) {
+    NSError *error;
+    if (![FBConfiguration setScreenshotOrientation:(NSString *)[settings objectForKey:SCREENSHOT_ORIENTATION]
+                                             error:&error]) {
+      return FBResponseWithStatus([FBCommandStatus invalidArgumentErrorWithMessage:error.description traceback:nil]);
+    }
+
+
+  }
+#endif
 
   return [self handleGetSettings:request];
 }

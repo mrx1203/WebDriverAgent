@@ -66,6 +66,7 @@ static bool fb_isLocked;
     return NO;
   }*/
   return YES;
+  //return [FBSpringboardApplication.fb_springboard fb_switchToWithError:error];
 }
 
 - (BOOL)fb_lockScreen:(NSError **)error

@@ -133,26 +133,75 @@ describe('checking for dependencies', function () {
 
 describe('launch', function () {
   it('should use webDriverAgentUrl override and return current status', async function () {
+<<<<<<< HEAD
     let override = 'http://mockurl:8100/';
     let args = Object.assign({}, fakeConstructorArgs);
     args.webDriverAgentUrl = override;
     let agent = new WebDriverAgent({}, args);
     let wdaStub = sinon.stub(agent, 'getStatus');
+=======
+    const override = 'http://mockurl:8100/';
+    const args = Object.assign({}, fakeConstructorArgs);
+    args.webDriverAgentUrl = override;
+    const agent = new WebDriverAgent({}, args);
+    const wdaStub = sinon.stub(agent, 'getStatus');
+>>>>>>> appium
     wdaStub.callsFake(function () {
       return {build: 'data'};
     });
 
     await agent.launch('sessionId').should.eventually.eql({build: 'data'});
     agent.url.href.should.eql(override);
+<<<<<<< HEAD
+=======
+    agent.jwproxy.server.should.eql('mockurl');
+    agent.jwproxy.port.should.eql('8100');
+    agent.jwproxy.base.should.eql('');
+    agent.noSessionProxy.server.should.eql('mockurl');
+    agent.noSessionProxy.port.should.eql('8100');
+    agent.noSessionProxy.base.should.eql('');
+>>>>>>> appium
     wdaStub.reset();
   });
 });
 
+<<<<<<< HEAD
+=======
+describe('use wda proxy url', function () {
+  it('should use webDriverAgentUrl wda proxy url', async function () {
+    const override = 'http://127.0.0.1:8100/aabbccdd';
+    const args = Object.assign({}, fakeConstructorArgs);
+    args.webDriverAgentUrl = override;
+    const agent = new WebDriverAgent({}, args);
+    const wdaStub = sinon.stub(agent, 'getStatus');
+    wdaStub.callsFake(function () {
+      return {build: 'data'};
+    });
+
+    await agent.launch('sessionId').should.eventually.eql({build: 'data'});
+
+    agent.url.port.should.eql('8100');
+    agent.url.hostname.should.eql('127.0.0.1');
+    agent.url.path.should.eql('/aabbccdd');
+    agent.jwproxy.server.should.eql('127.0.0.1');
+    agent.jwproxy.port.should.eql('8100');
+    agent.jwproxy.base.should.eql('/aabbccdd');
+    agent.noSessionProxy.server.should.eql('127.0.0.1');
+    agent.noSessionProxy.port.should.eql('8100');
+    agent.noSessionProxy.base.should.eql('/aabbccdd');
+  });
+});
+
+>>>>>>> appium
 describe('get url', function () {
   it('should use default WDA listening url', function () {
     const args = Object.assign({}, fakeConstructorArgs);
     const agent = new WebDriverAgent({}, args);
+<<<<<<< HEAD
     agent.url.href.should.eql('http://localhost:8100/');
+=======
+    agent.url.href.should.eql('http://127.0.0.1:8100/');
+>>>>>>> appium
   });
   it('should use default WDA listening url with emply base url', function () {
     const wdaLocalPort = '9100';
@@ -163,7 +212,11 @@ describe('get url', function () {
     args.wdaLocalPort = wdaLocalPort;
 
     const agent = new WebDriverAgent({}, args);
+<<<<<<< HEAD
     agent.url.href.should.eql('http://localhost:9100/');
+=======
+    agent.url.href.should.eql('http://127.0.0.1:9100/');
+>>>>>>> appium
   });
   it('should use customised WDA listening url', function () {
     const wdaLocalPort = '9100';
@@ -187,6 +240,18 @@ describe('get url', function () {
     const agent = new WebDriverAgent({}, args);
     agent.url.href.should.eql('http://mockurl:9100/');
   });
+<<<<<<< HEAD
+=======
+  it('should use the given webDriverAgentUrl and ignore other params', function () {
+    const args = Object.assign({}, fakeConstructorArgs);
+    args.wdaBaseUrl = 'http://mockurl/';
+    args.wdaLocalPort = '9100';
+    args.webDriverAgentUrl = 'https://127.0.0.1:8100/';
+
+    const agent = new WebDriverAgent({}, args);
+    agent.url.href.should.eql('https://127.0.0.1:8100/');
+  });
+>>>>>>> appium
 });
 
 describe('setupCaching()', function () {
@@ -230,7 +295,11 @@ describe('setupCaching()', function () {
     await wda.setupCaching();
     wdaStub.calledOnce.should.be.true;
     wdaStubUninstall.notCalled.should.be.true;
+<<<<<<< HEAD
     wda.webDriverAgentUrl.should.equal('http://localhost:8100/');
+=======
+    wda.webDriverAgentUrl.should.equal('http://127.0.0.1:8100/');
+>>>>>>> appium
   });
 
   it('should call uninstall once since bundle id is not default without updatedWDABundleId capability', async function () {
@@ -272,7 +341,11 @@ describe('setupCaching()', function () {
     await wda.setupCaching();
     wdaStub.calledOnce.should.be.true;
     wdaStubUninstall.notCalled.should.be.true;
+<<<<<<< HEAD
     wda.webDriverAgentUrl.should.equal('http://localhost:8100/');
+=======
+    wda.webDriverAgentUrl.should.equal('http://127.0.0.1:8100/');
+>>>>>>> appium
   });
 
   it('should call uninstall if current revision differs from the bundled one', async function () {

@@ -16,9 +16,19 @@ jobs:
       displayName: List Installed Applications
     - task: NodeTool@0
       inputs:
+<<<<<<< HEAD
         versionSpec: '12.x' 
     - script: npm install
       displayName: Install Node Modules
+=======
+        versionSpec: '12.x'
+    - script: npm install
+      displayName: Install Node Modules
+    - script: bundle update --bundler
+      displayName: Update Bundler
+    - script: bundle install
+      displayName: Install Ruby dependencies
+>>>>>>> appium
     - script: mkdir -p Resources/WebDriverAgent.bundle
       displayName: Make Resources Folder
     - script: node ./ci-jobs/scripts/build-webdriveragents.js

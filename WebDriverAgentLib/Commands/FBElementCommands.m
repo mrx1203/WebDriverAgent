@@ -79,6 +79,7 @@
     [[FBRoute POST:@"/wda/element/:uuid/rotate"] respondWithTarget:self action:@selector(handleRotate:)],
     [[FBRoute POST:@"/wda/element/:uuid/doubleTap"] respondWithTarget:self action:@selector(handleDoubleTap:)],
     [[FBRoute POST:@"/wda/element/:uuid/twoFingerTap"] respondWithTarget:self action:@selector(handleTwoFingerTap:)],
+    [[FBRoute POST:@"/wda/element/:uuid/tapWithNumberOfTaps"] respondWithTarget:self action:@selector(handleTapWithNumberOfTaps:)],
     [[FBRoute POST:@"/wda/element/:uuid/touchAndHold"] respondWithTarget:self action:@selector(handleTouchAndHold:)],
     [[FBRoute POST:@"/wda/element/:uuid/scroll"] respondWithTarget:self action:@selector(handleScroll:)],
     [[FBRoute POST:@"/wda/element/:uuid/dragfromtoforduration"] respondWithTarget:self action:@selector(handleDrag:)],
@@ -371,7 +372,7 @@
   if (focusedElement != nil) {
     FBElementCache *elementCache = request.session.elementCache;
     NSString *focusedUUID = [elementCache storeElement:focusedElement];
-    if ([focusedUUID isEqualToString:(id)request.parameters[@"uuid"]]) {
+    if (focusedUUID && [focusedUUID isEqualToString:(id)request.parameters[@"uuid"]]) {
       isFocused = YES;
     }
   }
@@ -425,6 +426,23 @@
                                                                              traceback:nil]);
   }
   [element twoFingerTap];
+  return FBResponseWithOK();
+}
+
++ (id<FBResponsePayload>)handleTapWithNumberOfTaps:(FBRouteRequest *)request
+{
+  FBElementCache *elementCache = request.session.elementCache;
+  if (nil == request.arguments[@"numberOfTaps"] || nil == request.arguments[@"numberOfTouches"]) {
+    return FBResponseWithStatus([FBCommandStatus invalidArgumentErrorWithMessage:@"Both 'numberOfTaps' and 'numberOfTouches' arguments must be provided"
+                                                                       traceback:nil]);
+  }
+  XCUIElement *element = [elementCache elementForUUID:request.parameters[@"uuid"]];
+  if (nil == element) {
+    return FBResponseWithStatus([FBCommandStatus staleElementReferenceErrorWithMessage:nil
+                                                                             traceback:nil]);
+  }
+  [element tapWithNumberOfTaps:[request.arguments[@"numberOfTaps"] integerValue]
+               numberOfTouches:[request.arguments[@"numberOfTouches"] integerValue]];
   return FBResponseWithOK();
 }
 
@@ -632,7 +650,8 @@
   NSString *textToType = request.arguments[@"value"];
   NSUInteger frequency = [request.arguments[@"frequency"] unsignedIntegerValue] ?: [FBConfiguration maxTypingFrequency];
   NSError *error;
-  if (![FBKeyboard typeText:textToType frequency:frequency error:&error]) {
+  if (![FBKeyboard waitUntilVisibleForApplication:request.session.activeApplication timeout:1 error:&error]
+      || ![FBKeyboard typeText:textToType frequency:frequency error:&error]) {
     return FBResponseWithStatus([FBCommandStatus invalidElementStateErrorWithMessage:error.description traceback:nil]);
   }
   return FBResponseWithOK();

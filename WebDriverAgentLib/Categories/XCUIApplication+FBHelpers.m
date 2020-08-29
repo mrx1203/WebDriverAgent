@@ -38,14 +38,21 @@ static NSString* const FBUnknownBundleId = @"unknown";
 
 - (BOOL)fb_waitForAppElement:(NSTimeInterval)timeout
 {
-  return [[[FBRunLoopSpinner new]
+  __block BOOL canDetectAxElement = YES;
+  int currentProcessIdentifier = self.accessibilityElement.processIdentifier;
+  BOOL result = [[[FBRunLoopSpinner new]
            timeout:timeout]
           spinUntilTrue:^BOOL{
     XCAccessibilityElement *currentAppElement = FBActiveAppDetectionPoint.sharedInstance.axElement;
-    int currentProcessIdentifier = self.accessibilityElement.processIdentifier;
-    return nil != currentAppElement
-      && currentAppElement.processIdentifier == currentProcessIdentifier;
+    canDetectAxElement = nil != currentAppElement;
+    if (!canDetectAxElement) {
+      return YES;
+    }
+    return currentAppElement.processIdentifier == currentProcessIdentifier;
   }];
+  return canDetectAxElement
+    ? result
+    : [self waitForExistenceWithTimeout:timeout];
 }
 
 + (NSArray<NSDictionary<NSString *, id> *> *)fb_appsInfoWithAxElements:(NSArray<XCAccessibilityElement *> *)axElements
@@ -91,38 +98,32 @@ static NSString* const FBUnknownBundleId = @"unknown";
 
 - (NSDictionary *)fb_tree
 {
-  if ([FBConfiguration shouldUseTestManagerForVisibilityDetection]) {
-    [self fb_waitUntilSnapshotIsStable];
-  }
-
-  // If getting the snapshot with attributes fails we use the snapshot with lazily initialized attributes
-  XCElementSnapshot *snapshot = self.fb_lastSnapshot;//self.fb_snapshotWithAttributes ?: self.fb_lastSnapshot;
-
-  NSMutableDictionary *snapshotTree = [[self.class dictionaryForElement:snapshot recursive:NO] mutableCopy];
-
-  NSArray<XCUIElement *> *children = [self fb_filterDescendantsWithSnapshots:snapshot.children];
-  NSMutableArray<NSDictionary *> *childrenTree = [NSMutableArray arrayWithCapacity:children.count];
-
+  XCElementSnapshot *snapshot = self.fb_cachedSnapshot ?: self.fb_lastSnapshot;
+  NSMutableDictionary *rootTree = [[self.class dictionaryForElement:snapshot recursive:NO] mutableCopy];
+  NSArray<XCUIElement *> *children = [self fb_filterDescendantsWithSnapshots:snapshot.children
+                                                                     selfUID:snapshot.wdUID
+                                                                onlyChildren:YES];
+  NSMutableArray<NSDictionary *> *childrenTrees = [NSMutableArray arrayWithCapacity:children.count];
+  [self fb_waitUntilSnapshotIsStable];
   for (XCUIElement* child in children) {
-    XCElementSnapshot *childSnapshot = child.fb_lastSnapshot;//child.fb_snapshotWithAttributes ?: child.fb_lastSnapshot;
+    XCElementSnapshot *childSnapshot = child.fb_snapshotWithAllAttributes;
     if (nil == childSnapshot) {
+      [FBLogger logFmt:@"Skipping source dump for '%@' because its snapshot cannot be resolved", child.description];
       continue;
     }
-    [childrenTree addObject:[self.class dictionaryForElement:childSnapshot recursive:YES]];
+    [childrenTrees addObject:[self.class dictionaryForElement:childSnapshot recursive:YES]];
   }
+  // This is necessary because web views are not visible in the native page source otherwise
+  [rootTree setObject:childrenTrees.copy forKey:@"children"];
 
-  if (childrenTree.count > 0) {
-    [snapshotTree setObject:childrenTree.copy forKey:@"children"];
-  }
-
-  return snapshotTree.copy;
+  return rootTree.copy;
 }
 
 - (NSDictionary *)fb_accessibilityTree
 {
   [self fb_waitUntilSnapshotIsStable];
   // We ignore all elements except for the main window for accessibility tree
-  return [self.class accessibilityInfoForElement:(self.fb_snapshotWithAttributes ?: self.fb_lastSnapshot)];
+  return [self.class accessibilityInfoForElement:(self.fb_snapshotWithAllAttributes ?: self.fb_lastSnapshot)];
 }
 
 + (NSDictionary *)dictionaryForElement:(XCElementSnapshot *)snapshot recursive:(BOOL)recursive
@@ -194,7 +195,15 @@ static NSString* const FBUnknownBundleId = @"unknown";
 
 - (NSString *)fb_xmlRepresentation
 {
-  return [FBXPath xmlStringWithRootElement:self];
+  return [FBXPath xmlStringWithRootElement:self excludingAttributes:nil];
+}
+
+- (NSString *)fb_xmlRepresentationWithoutAttributes:(NSArray<NSString *> *)excludedAttributes
+{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnullable-to-nonnull-conversion"
+  return [FBXPath xmlStringWithRootElement:self excludingAttributes:excludedAttributes];
+#pragma clang diagnostic pop
 }
 
 - (NSString *)fb_descriptionRepresentation
@@ -224,5 +233,21 @@ static NSString* const FBUnknownBundleId = @"unknown";
           fb_firstMatch];
 }
 #endif
+
++ (NSInteger)fb_testmanagerdVersion
+{
+  static dispatch_once_t getTestmanagerdVersion;
+  static NSInteger testmanagerdVersion;
+  dispatch_once(&getTestmanagerdVersion, ^{
+    id<XCTestManager_ManagerInterface> proxy = [FBXCTestDaemonsProxy testRunnerProxy];
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    [proxy _XCT_exchangeProtocolVersion:testmanagerdVersion reply:^(unsigned long long code) {
+      testmanagerdVersion = (NSInteger) code;
+      dispatch_semaphore_signal(sem);
+    }];
+    dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)));
+  });
+  return testmanagerdVersion;
+}
 
 @end
