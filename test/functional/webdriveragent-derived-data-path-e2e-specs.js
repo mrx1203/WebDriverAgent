@@ -2,11 +2,7 @@ import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { getSimulator } from 'appium-ios-simulator';
 import { shutdownSimulator, deleteDeviceWithRetry } from './helpers/simulator';
-<<<<<<< HEAD
-import { createDevice } from 'node-simctl';
-=======
 import Simctl from 'node-simctl';
->>>>>>> appium
 import { MOCHA_TIMEOUT, initSession, deleteSession } from './helpers/session';
 import { UICATALOG_SIM_CAPS } from './desired';
 import path from 'path';
@@ -27,11 +23,7 @@ describe('WebDriverAgent Derived Data Path', function () {
 
   let driver;
   before(async function () {
-<<<<<<< HEAD
-    const udid = await createDevice(
-=======
     const udid = await new Simctl().createDevice(
->>>>>>> appium
       SIM_DEVICE_NAME,
       UICATALOG_SIM_CAPS.deviceName,
       UICATALOG_SIM_CAPS.platformVersion

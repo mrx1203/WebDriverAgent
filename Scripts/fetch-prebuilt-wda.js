@@ -1,17 +1,8 @@
 const path = require('path');
-<<<<<<< HEAD
-const request = require('request-promise');
-const requestCallback = require('request');
-const { asyncify } = require('asyncbox');
-const { logger, fs, mkdirp } = require('appium-support');
-const _ = require('lodash');
-const _fs = require('fs');
-=======
 const axios = require('axios');
 const { asyncify } = require('asyncbox');
 const { logger, fs, mkdirp, net } = require('appium-support');
 const _ = require('lodash');
->>>>>>> appium
 const B = require('bluebird');
 
 const log = logger.getLogger('WDA');
@@ -23,16 +14,6 @@ async function fetchPrebuiltWebDriverAgentAssets () {
   log.info(`Getting WDA release ${downloadUrl}`);
   let releases;
   try {
-<<<<<<< HEAD
-    releases = await request.get(downloadUrl, {
-      headers: {
-        'user-agent': 'appium',
-      },
-      json: true,
-    });
-  } catch (e) {
-    throw new Error(`Could not fetch endpoint '${downloadUrl}. Reason: ${e.message}'`);
-=======
     releases = (await axios({
       url: downloadUrl,
       headers: {
@@ -42,7 +23,6 @@ async function fetchPrebuiltWebDriverAgentAssets () {
     })).data;
   } catch (e) {
     throw new Error(`Could not fetch endpoint ${downloadUrl}. Reason: ${e.message}`);
->>>>>>> appium
   }
 
   const webdriveragentsDir = path.resolve(__dirname, '..', 'prebuilt-agents');
@@ -53,23 +33,7 @@ async function fetchPrebuiltWebDriverAgentAssets () {
   // Define a method that does a streaming download of an asset
   async function downloadAgent (url, targetPath) {
     try {
-<<<<<<< HEAD
-      // don't use request-promise here, we need streams
-      return await new B((resolve, reject) => {
-        requestCallback(url)
-          .on('error', reject) // handle real errors, like connection errors
-          .on('response', (res) => {
-            // handle responses that fail, like 404s
-            if (res.statusCode >= 400) {
-              return reject(new Error(`${res.statusCode} - ${res.statusMessage}`));
-            }
-          })
-          .pipe(_fs.createWriteStream(targetPath))
-          .on('close', resolve);
-      });
-=======
       await net.downloadFile(url, targetPath);
->>>>>>> appium
     } catch (err) {
       throw new Error(`Problem downloading webdriveragent from url ${url}: ${err.message}`);
     }
