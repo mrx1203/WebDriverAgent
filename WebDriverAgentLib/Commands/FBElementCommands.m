@@ -112,36 +112,47 @@
   return FBResponseWithOK();*/
   XCUIApplication* application = FBApplication.fb_activeApplication;
   CGPoint tapPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
-  NSTimeInterval duration = [request.arguments[@"duration"] doubleValue];
-  XCUIElement *element = application.windows.fb_firstMatch;
+  //NSTimeInterval duration = [request.arguments[@"duration"] doubleValue];
+  //XCUIElement *element = application.windows.fb_firstMatch;
   
-  if(isSDKVersionLessThan(@"11.0")){
-    CGSize frameSize = application.frame.size;
-    UIInterfaceOrientation orientation = application.interfaceOrientation;
-    tapPoint = FBInvertPointForApplication(tapPoint, frameSize, orientation);
-  }
-  if(duration>0.5 || SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"13.0")){
-    XCUICoordinate *appCoordinate = [[XCUICoordinate alloc] initWithElement:element normalizedOffset:CGVectorMake(0, 0)];
-    XCUICoordinate *tapCoordinate  = [[XCUICoordinate alloc] initWithCoordinate:appCoordinate pointsOffset:CGVectorMake(tapPoint.x, tapPoint.y)];
-    if(duration>0.5){
-       [tapCoordinate pressForDuration:duration];
-    }
-    else{
-       [tapCoordinate tap];
-    }
-  } else {
+//  if(isSDKVersionLessThan(@"11.0")){
+//    CGSize frameSize = application.frame.size;
+//    UIInterfaceOrientation orientation = application.interfaceOrientation;
+//    tapPoint = FBInvertPointForApplication(tapPoint, frameSize, orientation);
+//  }
+//  if(duration>0.5 || SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"13.0")){
+//    //XCUICoordinate *appCoordinate = [[XCUICoordinate alloc] initWithElement:element normalizedOffset:CGVectorMake(0, 0)];
+//    //XCUICoordinate *tapCoordinate  = [[XCUICoordinate alloc] initWithCoordinate:appCoordinate pointsOffset:CGVectorMake(tapPoint.x, tapPoint.y)];
+//    XCUICoordinate* tapCoordinate = [[application coordinateWithNormalizedOffset:CGVectorMake(0.0, 0.0)] coordinateWithOffset:CGVectorMake(tapPoint.x, tapPoint.y)];
+//    if(duration>0.5){
+//       [tapCoordinate pressForDuration:duration];
+//    }
+//    else{
+//       [tapCoordinate tap];
+//    }
+//  } else {
+//    NSArray<NSDictionary<NSString *, id> *> *tapGesture =
+//    @[
+//       @{@"action": @"tap",
+//         @"options": @{
+//           @"element": element,
+//           @"x": @(tapPoint.x),
+//           @"y": @(tapPoint.y)
+//           }
+//       }
+//    ];
+
     NSArray<NSDictionary<NSString *, id> *> *tapGesture =
-    @[
-       @{@"action": @"tap",
-         @"options": @{
-           @"element": element,
-           @"x": @(tapPoint.x),
-           @"y": @(tapPoint.y)
-           }
-       }
-    ];
+    @[@{
+        @"action": @"tap",
+        @"options": @{
+            @"x": @(tapPoint.x),
+            @"y": @(tapPoint.y),
+            }
+        }
+      ];
     [application fb_performAppiumTouchActions:tapGesture elementCache:nil error:nil];
-  }
+  //}
   return FBResponseWithOK();
 }
 
