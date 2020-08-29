@@ -191,16 +191,11 @@
 
 - (BOOL)isWDSelected
 {
-  return self.isSelected;
-}
+  //id (^getter)(void) = ^id(void) {
+    return self.isSelected;
+  //};
 
-- (BOOL)isWDSelected
-{
-  id (^getter)(void) = ^id(void) {
-    return @(self.isSelected);
-  };
-
-  return [[self fb_cachedValueWithAttributeName:@"isWDSelected" valueGetter:getter] boolValue];
+  //return [[self fb_cachedValueWithAttributeName:@"isWDSelected" valueGetter:getter] boolValue];
 }
 
 - (NSDictionary *)wdRect

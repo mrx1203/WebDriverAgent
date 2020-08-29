@@ -71,7 +71,6 @@
   if (!self.isPresent) {
     return nil;
   }
-  NSArray<XCUIElement *> *staticTextList = [alert.fb_query descendantsMatchingType:XCUIElementTypeStaticText].allElementsBoundByAccessibilityElement;
   NSMutableArray<NSString *> *resultText = [NSMutableArray array];
   XCElementSnapshot *snapshot = self.alertElement.fb_cachedSnapshot ?: self.alertElement.fb_lastSnapshot;
   [snapshot enumerateDescendantsUsingBlock:^(XCElementSnapshot *descendant) {
@@ -216,6 +215,60 @@
         withDescriptionFormat:@"Failed to find dismiss button for alert: %@", self.alertElement]
      buildError:error]
     : [dismissButton fb_tapWithError:error];
+}
+
+- (BOOL)actionWithAction:(NSString *)action error:(NSError **)error {
+  NSArray<NSDictionary *> *actions = (id)action;
+  for (NSDictionary *act in actions) {
+    BOOL match = NO;
+    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"SELF MATCHES %@", act[@"regex"]];
+    for (NSString *s in [self.text componentsSeparatedByString:@"\n"]) {
+      match = [predicate evaluateWithObject:s];
+      if (match) {
+        break;
+      }
+    }
+    if (match) {
+      XCUIElement *dismissButton = nil;
+      if (nil == dismissButton) {
+        NSArray<XCUIElement *> *buttons = [self.alertElement.fb_query
+                                           descendantsMatchingType:XCUIElementTypeButton].allElementsBoundByIndex;
+        NSString *errorReason = nil;
+        @try {
+          if (act[@"btns"]) {
+            NSArray<NSString *> *btns = act[@"btns"];
+            for (XCUIElement *btn in buttons) {
+              for (NSString *title in btns) {
+                NSPredicate *btnPredicate = [NSPredicate predicateWithFormat:@"SELF MATCHES %@", title];
+                if ([btnPredicate evaluateWithObject:btn.wdLabel]) {
+                  dismissButton = btn;
+                  break;
+                }
+              }
+              if (dismissButton) {
+                break;
+              }
+            }
+          } else {
+            dismissButton = (self.alertElement.elementType == XCUIElementTypeAlert || [self isSafariWebAlert])
+              ? [buttons objectAtIndex:[act[@"index"] integerValue]]
+            : [buttons objectAtIndex:(buttons.count - [act[@"index"] integerValue] - 1)];
+          }
+        } @catch (NSException *ex) {
+          errorReason = ex.reason;
+        }
+        if (nil == dismissButton) {
+          [FBLogger logFmt:@"Original error: %@", errorReason];
+        }
+      }
+      return nil == dismissButton
+        ? [[[FBErrorBuilder builder]
+            withDescriptionFormat:@"Failed to find dismiss button for alert: %@", self.alertElement]
+         buildError:error]
+        : [dismissButton fb_tapWithError:error];
+    }
+  }
+  return YES;
 }
 
 - (BOOL)clickAlertButton:(NSString *)label error:(NSError **)error

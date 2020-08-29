@@ -53,7 +53,12 @@ NSString *const FBDefaultApplicationAuto = @"auto";
   }
 
   NSError *error;
-  if ([self.defaultAlertAction isEqualToString:@"accept"]) {
+  if ([self.defaultAlertAction isKindOfClass:[NSArray class]]){
+    if (![alert actionWithAction:self.defaultAlertAction error:&error]) {
+      [FBLogger logFmt:@"Cannot action the alert. Original error: %@", error.description];
+    }
+  }
+  else if ([self.defaultAlertAction isEqualToString:@"accept"]) {
     if (![alert acceptWithError:&error]) {
       [FBLogger logFmt:@"Cannot accept the alert. Original error: %@", error.description];
     }
@@ -61,7 +66,20 @@ NSString *const FBDefaultApplicationAuto = @"auto";
     if (![alert dismissWithError:&error]) {
       [FBLogger logFmt:@"Cannot dismiss the alert. Original error: %@", error.description];
     }
-  } else {
+  }
+  else if ([self.defaultAlertAction hasPrefix:@"["] && [self.defaultAlertAction hasSuffix:@"]"]) {
+    NSError *jsonError;
+    NSData *objectData = [self.defaultAlertAction dataUsingEncoding:NSUTF8StringEncoding];
+    NSArray<NSDictionary *> *actions = [NSJSONSerialization JSONObjectWithData:objectData options:NSJSONReadingMutableContainers error:&jsonError];
+    if (jsonError) {
+      return ;
+    }
+    self.defaultAlertAction = (NSString*)actions;
+    if (![alert actionWithAction:self.defaultAlertAction error:&error]) {
+      [FBLogger logFmt:@"Cannot action the alert. Original error: %@", error.description];
+    }
+  }
+  else {
     [FBLogger logFmt:@"'%@' default alert action is unsupported", self.defaultAlertAction];
   }
 }
@@ -120,7 +138,11 @@ static FBSession *_activeSession = nil;
   session.alertsMonitor = [[FBAlertsMonitor alloc] init];
   session.alertsMonitor.delegate = (id<FBAlertsMonitorDelegate>)session;
   session.alertsMonitor.application = application;
-  session.defaultAlertAction = [defaultAlertAction lowercaseString];
+  if([defaultAlertAction isKindOfClass:[NSArray class]]){
+    session.defaultAlertAction = defaultAlertAction;
+  }else{
+    session.defaultAlertAction = [defaultAlertAction lowercaseString];
+  }
   [session.alertsMonitor enable];
   return session;
 }

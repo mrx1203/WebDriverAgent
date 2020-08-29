@@ -32,8 +32,6 @@ NS_ASSUME_NONNULL_BEGIN
 /*! Element's selected state */
 @property (nonatomic, readonly, getter = isWDSelected) BOOL wdSelected;
 
-/*! Element's selected state */
-@property (nonatomic, readonly, getter = isWDSelected) BOOL wdSelected;
 
 /*! Element's type */
 @property (nonatomic, readonly, copy) NSString *wdType;
