@@ -102,7 +102,7 @@ static const NSTimeInterval APP_STATE_CHANGE_TIMEOUT = 5.0;
   }
 
   if (activeApplicationElements.count > 0) {
-    [FBLogger logFmt:@"Getting the most recent active application (out of %@ total items)", @(activeApplicationElements.count)];
+    //[FBLogger logFmt:@"Getting the most recent active application (out of %@ total items)", @(activeApplicationElements.count)];
     for (XCAccessibilityElement *appElement in activeApplicationElements) {
       FBApplication *application = [FBApplication fb_applicationWithPID:appElement.processIdentifier];
       if (nil != application) {

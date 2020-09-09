@@ -24,7 +24,7 @@
 #import "XCAXClient_iOS.h"
 #import "FBMacros.h"
 
-static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.1;
+static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.2;
 static const NSUInteger MAX_FPS = 60;
 
 static NSString *const SERVER_NAME = @"WDA MJPEG Server";
@@ -39,6 +39,7 @@ static long count = 0;
 @property (nonatomic, readonly) FBImageIOScaler *imageScaler;
 
 @property (nonatomic) double startTime;
+@property (nonatomic) double totalbytes;
 @end
 
 
@@ -57,6 +58,7 @@ static long count = 0;
     _imageScaler = [[FBImageIOScaler alloc] init];
   }
   self.startTime = [[NSDate date] timeIntervalSince1970];
+  self.totalbytes = 0;
   return self;
 }
 
@@ -113,8 +115,8 @@ static long count = 0;
     else{
       screenshotData = [[XCAXClient_iOS sharedClient] screenshotData];
     }
-    UIImage *img = [UIImage imageWithData:screenshotData];
-    screenshotData = UIImageJPEGRepresentation(img, 0.5);
+    //UIImage *img = [UIImage imageWithData:screenshotData];
+    //screenshotData = UIImageJPEGRepresentation(img, 0.1);
     dispatch_semaphore_signal(sem);
   }
   else{
@@ -135,18 +137,28 @@ static long count = 0;
     [self scheduleNextScreenshotWithInterval:timerInterval timeStarted:timeStarted];
     return;
   }
-
-  if (usesScaling) {
-    [self.imageScaler submitImage:screenshotData
-                    scalingFactor:scalingFactor
-               compressionQuality:compressionQuality
-                completionHandler:^(NSData * _Nonnull scaled) {
-                  [self sendScreenshot:scaled];
-                }];
-  } else {
-    [self sendScreenshot:screenshotData];
+  @try{
+    @autoreleasepool{
+      //double stime = [[NSDate date] timeIntervalSince1970];
+      UIImage *img = [UIImage imageWithData:screenshotData];
+      float div = 2;
+      if(img.size.width>1000&&img.size.height>1000){
+        div = 3.5;
+      }
+      CGSize size = CGSizeMake((NSUInteger)img.size.width/div,(NSUInteger)img.size.height/div);
+      CGContextRef context = UIGraphicsGetCurrentContext();
+      UIGraphicsBeginImageContext(size);
+      [img drawInRect:CGRectMake(0, 0, size.width, size.height)];
+      img = UIGraphicsGetImageFromCurrentImageContext();
+      UIGraphicsEndImageContext();
+      CGContextRelease(context);
+      screenshotData = UIImageJPEGRepresentation(img, 0.01);
+      //NSLog(@"--------%f",[[NSDate date] timeIntervalSince1970]-stime);
+      [self sendScreenshot:screenshotData];
+    }
+  }@catch(NSException *e) {
+    NSLog(@"%@",e);
   }
-
   [self scheduleNextScreenshotWithInterval:timerInterval timeStarted:timeStarted];
 }
 
@@ -162,10 +174,12 @@ static long count = 0;
   NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString--Content-type: image/jpg--=%ld=",(long)orientation];
   NSMutableData *chunk = [[chunkHeader dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
   [chunk appendData:screenshotData];
+  self.totalbytes += screenshotData.length;
   count+=1;
   double losttime = [[NSDate date] timeIntervalSince1970]-self.startTime;
   if(losttime>=1){
-    //NSLog(@"===================framerate is %f",count/losttime);
+    //NSLog(@"===================framerate is %f, total bytes is %f",count/losttime,self.totalbytes/1024);
+    self.totalbytes = 0;
     count = 0;
     self.startTime = [[NSDate date] timeIntervalSince1970];
   }
