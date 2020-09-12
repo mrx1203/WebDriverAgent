@@ -24,7 +24,7 @@
 #import "XCAXClient_iOS.h"
 #import "FBMacros.h"
 
-static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.2;
+static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.5;
 static const NSUInteger MAX_FPS = 60;
 
 static NSString *const SERVER_NAME = @"WDA MJPEG Server";
@@ -98,12 +98,12 @@ static long count = 0;
   __block NSData *screenshotData = nil;
 
   CGFloat scalingFactor = [FBConfiguration mjpegScalingFactor] / 100.0f;
-  BOOL usesScaling = fabs(FBMaxScalingFactor - scalingFactor) > DBL_EPSILON;
-
-  CGFloat compressionQuality = FBConfiguration.mjpegServerScreenshotQuality / 100.0f;
+  //BOOL usesScaling = fabs(FBMaxScalingFactor - scalingFactor) > DBL_EPSILON;
+  //NSLog(@"--------framerate=%lu, scaleingFactor=%f",(unsigned long)framerate,scalingFactor);
+  //CGFloat compressionQuality = FBConfiguration.mjpegServerScreenshotQuality / 100.0f;
   // If scaling is applied we perform another JPEG compression after scaling
   // To get the desired compressionQuality we need to do a lossless compression here
-  CGFloat screenshotCompressionQuality = usesScaling ? FBMaxCompressionQuality : compressionQuality;
+  CGFloat screenshotCompressionQuality = FBMaxCompressionQuality;//usesScaling ? FBMaxCompressionQuality : compressionQuality;
 
   id<XCTestManager_ManagerInterface> proxy = [FBXCTestDaemonsProxy testRunnerProxy];
   dispatch_semaphore_t sem = dispatch_semaphore_create(0);
@@ -141,11 +141,7 @@ static long count = 0;
     @autoreleasepool{
       //double stime = [[NSDate date] timeIntervalSince1970];
       UIImage *img = [UIImage imageWithData:screenshotData];
-      float div = 2;
-      if(img.size.width>1000&&img.size.height>1000){
-        div = 3.5;
-      }
-      CGSize size = CGSizeMake((NSUInteger)img.size.width/div,(NSUInteger)img.size.height/div);
+      CGSize size = CGSizeMake((NSUInteger)img.size.width*scalingFactor,(NSUInteger)img.size.height*scalingFactor);
       CGContextRef context = UIGraphicsGetCurrentContext();
       UIGraphicsBeginImageContext(size);
       [img drawInRect:CGRectMake(0, 0, size.width, size.height)];
