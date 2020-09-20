@@ -37,7 +37,7 @@ static NSUInteger FBMjpegServerScreenshotQuality = 60;
 static NSUInteger FBMjpegServerFramerate = 30;
 static NSUInteger FBScreenshotQuality = 1;
 static NSUInteger FBMjpegScalingFactor = 50;
-static NSTimeInterval FBSnapshotTimeout = 15.;
+static NSTimeInterval FBSnapshotTimeout = 65.;
 static BOOL FBShouldUseFirstMatch = NO;
 static BOOL FBShouldBoundElementsByIndex = NO;
 // This is diabled by default because enabling it prevents the accessbility snapshot to be taken

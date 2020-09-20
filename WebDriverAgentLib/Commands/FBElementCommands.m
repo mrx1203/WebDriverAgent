@@ -661,6 +661,10 @@
   NSString *textToType = request.arguments[@"value"];
   NSUInteger frequency = [request.arguments[@"frequency"] unsignedIntegerValue] ?: [FBConfiguration maxTypingFrequency];
   NSError *error;
+  if([textToType isKindOfClass:[NSArray class]]){
+    NSArray* textArray =(NSArray*)textToType;
+    textToType = [textArray componentsJoinedByString:@""];
+  }
   if (![FBKeyboard waitUntilVisibleForApplication:request.session.activeApplication timeout:1 error:&error]
       || ![FBKeyboard typeText:textToType frequency:frequency error:&error]) {
     return FBResponseWithStatus([FBCommandStatus invalidElementStateErrorWithMessage:error.description traceback:nil]);
