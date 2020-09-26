@@ -40,6 +40,7 @@
 #import "XCUIElementQuery.h"
 #import "FBXCodeCompatibility.h"
 #import "XCUIApplication+FBTouchAction.h"
+#import "FBScreen.h"
 //#import "XCEventGenerator.h"
 
 @interface FBElementCommands ()
@@ -54,6 +55,7 @@
   return
   @[
     [[FBRoute GET:@"/window/size"] respondWithTarget:self action:@selector(handleGetWindowSize:)],
+    [[FBRoute GET:@"/window/size"].withoutSession respondWithTarget:self action:@selector(handleGetWindowSize_stf:)],
     [[FBRoute GET:@"/element/:uuid/enabled"] respondWithTarget:self action:@selector(handleGetEnabled:)],
     [[FBRoute GET:@"/element/:uuid/rect"] respondWithTarget:self action:@selector(handleGetRect:)],
     [[FBRoute GET:@"/element/:uuid/attribute/:name"] respondWithTarget:self action:@selector(handleGetAttribute:)],
@@ -698,6 +700,23 @@
     @"height": @(screenSize.height),
   });
 }
+
++ (id<FBResponsePayload>)handleGetWindowSize_stf:(FBRouteRequest *)request
+  {
+    XCUIApplication *application = [FBApplication fb_activeApplication];
+  #if TARGET_OS_TV
+    CGSize screenSize = application.frame.size;
+  #else
+    CGRect frame = application.wdFrame;
+    CGSize screenSize = FBAdjustDimensionsForApplication(frame.size, application.interfaceOrientation);
+  #endif
+    return FBResponseWithObject(@{
+      @"width": @(screenSize.width),
+      @"height": @(screenSize.height),
+      @"scale": @([FBScreen scale]),
+      @"func":@"windowsize"
+    });
+  }
 
 + (id<FBResponsePayload>)handleElementScreenshot:(FBRouteRequest *)request
 {
