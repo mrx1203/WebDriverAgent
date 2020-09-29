@@ -61,7 +61,7 @@ static const NSTimeInterval FB_ANIMATION_TIMEOUT = 5.0;
 
 - (nullable XCElementSnapshot *)fb_snapshotWithAllAttributes {
   NSMutableArray *allNames = [NSMutableArray arrayWithArray:FBStandardAttributeNames().allObjects];
-  [allNames addObjectsFromArray:FBCustomAttributeNames().allObjects];
+  //[allNames addObjectsFromArray:FBCustomAttributeNames().allObjects];
   return [self fb_snapshotWithAttributes:allNames.copy];
 }
 

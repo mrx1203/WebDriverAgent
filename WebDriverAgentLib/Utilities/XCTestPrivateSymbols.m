@@ -92,8 +92,8 @@ NSSet<NSString*> *FBCustomAttributeNames(void)
   static dispatch_once_t onceCustomAttributeNamesToken;
   dispatch_once(&onceCustomAttributeNamesToken, ^{
     customNames = [NSSet setWithArray:@[
-      FB_XCAXAIsVisibleAttributeName,
-      FB_XCAXAIsElementAttributeName
+      //FB_XCAXAIsVisibleAttributeName,
+      //FB_XCAXAIsElementAttributeName
     ]];
   });
   return customNames;
