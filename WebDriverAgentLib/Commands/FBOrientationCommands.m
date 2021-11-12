@@ -40,12 +40,13 @@ const struct FBWDOrientationValues FBWDOrientationValues = {
   return
   @[
     [[FBRoute GET:@"/orientation"] respondWithTarget:self action:@selector(handleGetOrientation:)],
+    [[FBRoute GET:@"/orientation"].withoutSession respondWithTarget:self action:@selector(handleGetOrientation:)],
     [[FBRoute POST:@"/orientation"] respondWithTarget:self action:@selector(handleSetOrientation:)],
+    [[FBRoute POST:@"/orientation"].withoutSession respondWithTarget:self action:@selector(handleSetOrientation:)],
     [[FBRoute GET:@"/rotation"] respondWithTarget:self action:@selector(handleGetRotation:)],
+    [[FBRoute GET:@"/rotation"].withoutSession respondWithTarget:self action:@selector(handleGetRotation:)],
     [[FBRoute POST:@"/rotation"] respondWithTarget:self action:@selector(handleSetRotation:)],
-    //用于远程控制，通过旋转角度设置横竖屏
-    [[FBRoute POST:@"/orientation_Control"].withoutSession respondWithTarget:self action:@selector(handleSetOrientation_Control:)],
-    [[FBRoute GET:@"/orientation_Control"].withoutSession respondWithTarget:self action:@selector(handleGetOrientation_Control:)],
+    [[FBRoute POST:@"/rotation"].withoutSession respondWithTarget:self action:@selector(handleSetRotation:)],
   ];
 }
 
@@ -54,15 +55,15 @@ const struct FBWDOrientationValues FBWDOrientationValues = {
 
 + (id<FBResponsePayload>)handleGetOrientation:(FBRouteRequest *)request
 {
-  FBSession *session = request.session;
-  NSString *orientation = [self.class interfaceOrientationForApplication:session.activeApplication];
+  FBApplication *application = request.session.activeApplication ?: FBApplication.fb_activeApplication;
+  NSString *orientation = [self.class interfaceOrientationForApplication:application];
   return FBResponseWithObject([[self _wdOrientationsMapping] objectForKey:orientation]);
 }
 
 + (id<FBResponsePayload>)handleSetOrientation:(FBRouteRequest *)request
 {
-  FBSession *session = request.session;
-  if ([self.class setDeviceOrientation:request.arguments[@"orientation"] forApplication:session.activeApplication]) {
+  FBApplication *application = request.session.activeApplication ?: FBApplication.fb_activeApplication;
+  if ([self.class setDeviceOrientation:request.arguments[@"orientation"] forApplication:application]) {
     return FBResponseWithOK();
   }
 
@@ -71,9 +72,9 @@ const struct FBWDOrientationValues FBWDOrientationValues = {
 
 + (id<FBResponsePayload>)handleGetRotation:(FBRouteRequest *)request
 {
-
   XCUIDevice *device = [XCUIDevice sharedDevice];
-  UIInterfaceOrientation orientation = request.session.activeApplication.interfaceOrientation;
+  FBApplication *application = request.session.activeApplication ?: FBApplication.fb_activeApplication;
+  UIInterfaceOrientation orientation = application.interfaceOrientation;
   return FBResponseWithObject(device.fb_rotationMapping[@(orientation)]);
 }
 
@@ -92,34 +93,26 @@ const struct FBWDOrientationValues FBWDOrientationValues = {
   };
   NSArray<NSDictionary *> *supportedRotations = XCUIDevice.sharedDevice.fb_rotationMapping.allValues;
   if (![supportedRotations containsObject:rotation]) {
-    NSString *errMessage = [NSString stringWithFormat:@"%@ rotation is not supported. Only the following values are supported: %@", rotation, supportedRotations];
+    NSString *errMessage = [
+      NSString stringWithFormat:@"%@ rotation is not supported. Only the following values are supported: %@",
+      rotation, supportedRotations
+    ];
     return FBResponseWithStatus([FBCommandStatus invalidArgumentErrorWithMessage:errMessage
                                                                        traceback:nil]);
   }
 
-  FBApplication *app = request.session.activeApplication;
-  if (![self.class setDeviceRotation:request.arguments forApplication:app]) {
-    NSString *errMessage = [NSString stringWithFormat:@"The current rotation cannot be set to %@. Make sure the %@ application supports it", rotation, app.bundleID];
+  FBApplication *application = request.session.activeApplication ?: FBApplication.fb_activeApplication;
+  if (![self.class setDeviceRotation:request.arguments forApplication:application]) {
+    NSString *errMessage = [
+      NSString stringWithFormat:@"The current rotation cannot be set to %@. Make sure the %@ application supports it",
+      rotation, application.bundleID
+    ];
     return FBResponseWithStatus([FBCommandStatus invalidElementStateErrorWithMessage:errMessage
                                                                            traceback:nil]);
   }
   return FBResponseWithOK();
 }
 
-+ (id<FBResponsePayload>)handleSetOrientation_Control:(FBRouteRequest *)request
-{
-  [XCUIDevice sharedDevice].orientation = [request.arguments[@"orientation"] integerValue];
-  return FBResponseWithOK();
-}
-
-+ (id<FBResponsePayload>)handleGetOrientation_Control:(FBRouteRequest *)request
-{
-  UIDeviceOrientation orientation = [XCUIDevice sharedDevice].orientation ;
-  return FBResponseWithObject( @{
-    @"func":@"orientation_Control",
-    @"orientation":[NSString stringWithFormat:@"%ld",(long)orientation]
-  });
-}
 
 #pragma mark - Helpers
 

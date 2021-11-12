@@ -10,10 +10,12 @@
 #import "FBCustomCommands.h"
 
 #import <XCTest/XCUIDevice.h>
+#import <CoreLocation/CoreLocation.h>
 
 #import "FBApplication.h"
 #import "FBConfiguration.h"
-#import "FBExceptionHandler.h"
+#import "FBKeyboard.h"
+#import "FBNotificationsHelper.h"
 #import "FBPasteboard.h"
 #import "FBResponsePayload.h"
 #import "FBRoute.h"
@@ -22,16 +24,12 @@
 #import "FBScreen.h"
 #import "FBSession.h"
 #import "FBXCodeCompatibility.h"
-#import "FBSpringboardApplication.h"
 #import "XCUIApplication+FBHelpers.h"
 #import "XCUIDevice+FBHelpers.h"
 #import "XCUIElement.h"
 #import "XCUIElement+FBIsVisible.h"
 #import "XCUIElementQuery.h"
 #import "FBUnattachedAppLauncher.h"
-
-//#import <dlfcn.h>
-//#include <CoreTelephony/CTCellularData.h>
 
 @implementation FBCustomCommands
 
@@ -58,11 +56,15 @@
     [[FBRoute GET:@"/wda/batteryInfo"] respondWithTarget:self action:@selector(handleGetBatteryInfo:)],
 #endif
     [[FBRoute POST:@"/wda/pressButton"] respondWithTarget:self action:@selector(handlePressButtonCommand:)],
+    [[FBRoute POST:@"/wda/performIoHidEvent"] respondWithTarget:self action:@selector(handlePeformIOHIDEvent:)],
+    [[FBRoute POST:@"/wda/expectNotification"] respondWithTarget:self action:@selector(handleExpectNotification:)],
     [[FBRoute POST:@"/wda/siri/activate"] respondWithTarget:self action:@selector(handleActivateSiri:)],
     [[FBRoute POST:@"/wda/apps/launchUnattached"].withoutSession respondWithTarget:self action:@selector(handleLaunchUnattachedApp:)],
     [[FBRoute GET:@"/wda/device/info"] respondWithTarget:self action:@selector(handleGetDeviceInfo:)],
-    //[[FBRoute GET:@"/wda/getWeaknetInfo"].withoutSession respondWithTarget:self action:@selector(handleGetWeakNetInfo:)],
+    [[FBRoute POST:@"/wda/resetAppAuth"] respondWithTarget:self action:@selector(handleResetAppAuth:)],
     [[FBRoute GET:@"/wda/device/info"].withoutSession respondWithTarget:self action:@selector(handleGetDeviceInfo:)],
+    [[FBRoute GET:@"/wda/device/location"] respondWithTarget:self action:@selector(handleGetLocation:)],
+    [[FBRoute GET:@"/wda/device/location"].withoutSession respondWithTarget:self action:@selector(handleGetLocation:)],
     [[FBRoute OPTIONS:@"/*"].withoutSession respondWithTarget:self action:@selector(handlePingCommand:)],
   ];
 }
@@ -99,30 +101,13 @@
 
 + (id<FBResponsePayload>)handleDismissKeyboardCommand:(FBRouteRequest *)request
 {
-#if TARGET_OS_TV
-  if ([self isKeyboardPresentForApplication:request.session.activeApplication]) {
-    [[XCUIRemote sharedRemote] pressButton: XCUIRemoteButtonMenu];
-  }
-#else
-  [request.session.activeApplication dismissKeyboard];
-#endif
   NSError *error;
-  NSString *errorDescription = @"The keyboard cannot be dismissed. Try to dismiss it in the way supported by your application under test.";
-  if ([UIDevice.currentDevice userInterfaceIdiom] == UIUserInterfaceIdiomPhone) {
-    errorDescription = @"The keyboard on iPhone cannot be dismissed because of a known XCTest issue. Try to dismiss it in the way supported by your application under test.";
-  }
-  BOOL isKeyboardNotPresent =
-  [[[[FBRunLoopSpinner new]
-     timeout:5]
-    timeoutErrorMessage:errorDescription]
-   spinUntilTrue:^BOOL{
-     return ![self isKeyboardPresentForApplication:request.session.activeApplication];
-   }
-   error:&error];
-  if (!isKeyboardNotPresent) {
-    return FBResponseWithStatus([FBCommandStatus elementNotVisibleErrorWithMessage:error.description traceback:[NSString stringWithFormat:@"%@", NSThread.callStackSymbols]]);
-  }
-  return FBResponseWithOK();
+  BOOL isDismissed = [request.session.activeApplication fb_dismissKeyboardWithKeyNames:request.arguments[@"keyNames"]
+                                                                                 error:&error];
+  return isDismissed
+    ? FBResponseWithOK()
+    : FBResponseWithStatus([FBCommandStatus invalidElementStateErrorWithMessage:error.description
+                                                                      traceback:nil]);
 }
 
 + (id<FBResponsePayload>)handlePingCommand:(FBRouteRequest *)request
@@ -131,11 +116,6 @@
 }
 
 #pragma mark - Helpers
-
-+ (BOOL)isKeyboardPresentForApplication:(XCUIApplication *)application {
-  XCUIElement *foundKeyboard = [application.fb_query descendantsMatchingType:XCUIElementTypeKeyboard].fb_firstMatch;
-  return foundKeyboard && foundKeyboard.fb_isVisible;
-}
 
 + (id<FBResponsePayload>)handleGetScreen:(FBRouteRequest *)request
 {
@@ -147,7 +127,6 @@
                         @"height": @(statusBarSize.height),
                         },
     @"scale": @([FBScreen scale]),
-    @"func":@"screen"
     });
 }
 
@@ -163,11 +142,7 @@
 + (id<FBResponsePayload>)handleIsLocked:(FBRouteRequest *)request
 {
   BOOL isLocked = [XCUIDevice sharedDevice].fb_isScreenLocked;
-  return FBResponseWithObject(@{
-      @"isLocked":isLocked ? @YES : @NO,
-      @"func":@"locked"
-  });
-  //return FBResponseWithObject(isLocked ? @YES : @NO);
+  return FBResponseWithObject(isLocked ? @YES : @NO);
 }
 
 + (id<FBResponsePayload>)handleUnlock:(FBRouteRequest *)request
@@ -250,11 +225,7 @@
   if (nil == result) {
     return FBResponseWithUnknownError(error);
   }
-  return FBResponseWithObject(@{
-    @"content":[result base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength],
-    @"func":@"getPasteboard"
-  });
-  //return FBResponseWithObject([result base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength]);
+  return FBResponseWithObject([result base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength]);
 }
 
 + (id<FBResponsePayload>)handleGetBatteryInfo:(FBRouteRequest *)request
@@ -264,8 +235,7 @@
   }
   return FBResponseWithObject(@{
     @"level": @([UIDevice currentDevice].batteryLevel),
-    @"state": @([UIDevice currentDevice].batteryState),
-    @"func":@"batteryInfo"
+    @"state": @([UIDevice currentDevice].batteryState)
   });
 }
 #endif
@@ -273,7 +243,9 @@
 + (id<FBResponsePayload>)handlePressButtonCommand:(FBRouteRequest *)request
 {
   NSError *error;
-  if (![XCUIDevice.sharedDevice fb_pressButton:(id)request.arguments[@"name"] error:&error]) {
+  if (![XCUIDevice.sharedDevice fb_pressButton:(id)request.arguments[@"name"]
+                                   forDuration:(NSNumber *)request.arguments[@"duration"]
+                                         error:&error]) {
     return FBResponseWithUnknownError(error);
   }
   return FBResponseWithOK();
@@ -288,6 +260,22 @@
   return FBResponseWithOK();
 }
 
++ (id <FBResponsePayload>)handlePeformIOHIDEvent:(FBRouteRequest *)request
+{
+  NSNumber *page = request.arguments[@"page"];
+  NSNumber *usage = request.arguments[@"usage"];
+  NSNumber *duration = request.arguments[@"duration"];
+  NSError *error;
+  if (![XCUIDevice.sharedDevice fb_performIOHIDEventWithPage:page.unsignedIntValue
+                                                       usage:usage.unsignedIntValue
+                                                    duration:duration.doubleValue
+                                                       error:&error]) {
+    return FBResponseWithStatus([FBCommandStatus unknownErrorWithMessage:error.description
+                                                               traceback:nil]);
+  }
+  return FBResponseWithOK();
+}
+
 + (id <FBResponsePayload>)handleLaunchUnattachedApp:(FBRouteRequest *)request
 {
   NSString *bundle = (NSString *)request.arguments[@"bundleId"];
@@ -297,6 +285,94 @@
   return FBResponseWithStatus([FBCommandStatus unknownErrorWithMessage:@"LSApplicationWorkspace failed to launch app" traceback:nil]);
 }
 
++ (id <FBResponsePayload>)handleResetAppAuth:(FBRouteRequest *)request
+{
+  NSNumber *resource = request.arguments[@"resource"];
+  if (nil == resource) {
+    NSString *errMsg = @"The 'resource' argument must be set to a valid resource identifier (numeric value). See https://developer.apple.com/documentation/xctest/xcuiprotectedresource?language=objc";
+    return FBResponseWithStatus([FBCommandStatus invalidArgumentErrorWithMessage:errMsg traceback:nil]);
+  }
+  NSError *error;
+  if (![request.session.activeApplication fb_resetAuthorizationStatusForResource:resource.longLongValue
+                                                                           error:&error]) {
+    return FBResponseWithUnknownError(error);
+  }
+  return FBResponseWithOK();
+}
+
+/**
+ Returns device location data.
+ It requires to configure location access permission by manual.
+ The response of 'latitude', 'longitude' and 'altitude' are always zero (0) without authorization.
+ 'authorizationStatus' indicates current authorization status. '3' is 'Always'.
+ https://developer.apple.com/documentation/corelocation/clauthorizationstatus
+
+ Settings -> Privacy -> Location Service -> WebDriverAgent-Runner -> Always
+
+ The return value could be zero even if the permission is set to 'Always'
+ since the location service needs some time to update the location data.
+ */
++ (id<FBResponsePayload>)handleGetLocation:(FBRouteRequest *)request
+{
+#if TARGET_OS_TV
+  return FBResponseWithStatus([FBCommandStatus unsupportedOperationErrorWithMessage:@"unsupported"
+                                                                          traceback:nil]);
+#else
+  CLLocationManager *locationManager = [[CLLocationManager alloc] init];
+  [locationManager setDistanceFilter:kCLHeadingFilterNone];
+  // Always return the best acurate location data
+  [locationManager setDesiredAccuracy:kCLLocationAccuracyBest];
+  [locationManager setPausesLocationUpdatesAutomatically:NO];
+  [locationManager startUpdatingLocation];
+
+  CLAuthorizationStatus authStatus;
+  if ([locationManager respondsToSelector:@selector(authorizationStatus)]) {
+    NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:[[locationManager class]
+      instanceMethodSignatureForSelector:@selector(authorizationStatus)]];
+    [invocation setSelector:@selector(authorizationStatus)];
+    [invocation setTarget:locationManager];
+    [invocation invoke];
+    [invocation getReturnValue:&authStatus];
+  } else {
+    authStatus = [CLLocationManager authorizationStatus];
+  }
+
+  return FBResponseWithObject(@{
+    @"authorizationStatus": @(authStatus),
+    @"latitude": @(locationManager.location.coordinate.latitude),
+    @"longitude": @(locationManager.location.coordinate.longitude),
+    @"altitude": @(locationManager.location.altitude),
+  });
+#endif
+}
+
++ (id<FBResponsePayload>)handleExpectNotification:(FBRouteRequest *)request
+{
+  NSString *name = request.arguments[@"name"];
+  if (nil == name) {
+    NSString *message = @"Notification name argument must be provided";
+    return FBResponseWithStatus([FBCommandStatus invalidArgumentErrorWithMessage:message traceback:nil]);
+  }
+  NSNumber *timeout = request.arguments[@"timeout"] ?: @60;
+  NSString *type = request.arguments[@"type"] ?: @"plain";
+
+  XCTWaiterResult result;
+  if ([type isEqualToString:@"plain"]) {
+    result = [FBNotificationsHelper waitForNotificationWithName:name timeout:timeout.doubleValue];
+  } else if ([type isEqualToString:@"darwin"]) {
+    result = [FBNotificationsHelper waitForDarwinNotificationWithName:name timeout:timeout.doubleValue];
+  } else {
+    NSString *message = [NSString stringWithFormat:@"Notification type could only be 'plain' or 'darwin'. Got '%@' instead", type];
+    return FBResponseWithStatus([FBCommandStatus invalidArgumentErrorWithMessage:message traceback:nil]);
+  }
+  if (result != XCTWaiterResultCompleted) {
+    NSString *message = [NSString stringWithFormat:@"Did not receive any expected %@ notifications within %@s",
+                         name, timeout];
+    return FBResponseWithStatus([FBCommandStatus timeoutErrorWithMessage:message traceback:nil]);
+  }
+  return FBResponseWithOK();
+}
+
 + (id<FBResponsePayload>)handleGetDeviceInfo:(FBRouteRequest *)request
 {
   // Returns locale like ja_EN and zh-Hant_US. The format depends on OS
@@ -304,7 +380,8 @@
   // https://developer.apple.com/documentation/foundation/nslocale/1414388-autoupdatingcurrentlocale
   NSString *currentLocale = [[NSLocale autoupdatingCurrentLocale] localeIdentifier];
 
-  return FBResponseWithObject(@{
+  NSMutableDictionary *deviceInfo = [NSMutableDictionary dictionaryWithDictionary:
+  @{
     @"currentLocale": currentLocale,
     @"timeZone": self.timeZone,
     @"name": UIDevice.currentDevice.name,
@@ -318,7 +395,14 @@
 #else
     @"isSimulator": @(NO),
 #endif
-  });
+  }];
+
+  if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.0")) {
+    // https://developer.apple.com/documentation/foundation/nsprocessinfothermalstate
+    deviceInfo[@"thermalState"] = @(NSProcessInfo.processInfo.thermalState);
+  }
+
+  return FBResponseWithObject(deviceInfo);
 }
 
 /**
@@ -372,77 +456,5 @@
 
   return [localTimeZone name];
 }
-
-/*+ (id<FBResponsePayload>)handleGetWeakNetInfo:(FBRouteRequest *)request
-{
-  
-  void * FTServicesHandle = dlopen("/System/Library/PrivateFrameworks/FTServices.framework/FTServices", RTLD_LAZY);
-  Class NetworkSupport = NSClassFromString(@"FTNetworkSupport");
-  
-#       pragma clang diagnostic push
-#       pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-  id networkSupport = [NetworkSupport performSelector:NSSelectorFromString(@"sharedInstance")];
-  [networkSupport performSelector:NSSelectorFromString(@"dataActiveAndReachable")];
-#       pragma clang diagnostic pop
-  
-
-  
-  CTCellularData *cellularData = [[CTCellularData alloc] init];
-  cellularData.cellularDataRestrictionDidUpdateNotifier = ^(CTCellularDataRestrictedState state) {
-    switch (state) {
-      case kCTCellularDataRestricted:
-        NSLog(@"Restricted");
-        //2.1权限关闭的情况下 再次请求网络数据会弹出设置网络提示
-        //        [self getAppInfo];
-        break;
-      case kCTCellularDataRestrictedStateUnknown:
-        NSLog(@"Unknown");
-        //2.2未知情况 （还没有遇到推测是有网络但是连接不正常的情况下）
-        //        [self getAppInfo];
-        break;
-      case kCTCellularDataNotRestricted:
-        NSLog(@"NotRestricted");
-        //2.3已经开启网络权限 监听网络状态
-        //卸载FTServices.framework
-        dlclose(FTServicesHandle);
-        break;
-      default:
-        break;
-    }
-  };
-  
-  void *CoreTelephonyHandle = dlopen("/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony", RTLD_LAZY);
-  //用函数指针来调用私有C函数，用符号名从库里寻找函数地址
-  CFTypeRef (*connectionCreateOnTargetQueue)(CFAllocatorRef, NSString *, dispatch_queue_t, void*) = (CFTypeRef (*)(CFAllocatorRef, NSString *, dispatch_queue_t, void*))dlsym(CoreTelephonyHandle, "_CTServerConnectionCreateOnTargetQueue");
-  int (*changeCellularPolicy)(CFTypeRef, NSString *, NSDictionary *) = (int (*)(CFTypeRef, NSString *, NSDictionary *))dlsym(CoreTelephonyHandle, "_CTServerConnectionSetCellularUsagePolicy");
-  //使用设置app的bundle id进行伪装
-  CFTypeRef connection = connectionCreateOnTargetQueue(kCFAllocatorDefault,@"com.apple.Preferences",dispatch_get_main_queue(),NULL);
-  //请求修改本app的网络权限为allowed，不会真的修改，只能触发系统更新一下相关的数据
-  changeCellularPolicy(connection, @"com.apple.test.WebDriverAgentRunner-Runner", @{@"kCTCellularUsagePolicyDataAllowed":@YES});
-  dlclose(CoreTelephonyHandle);
-  
-  dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-  NSURL *url =[NSURL URLWithString:@"http://172.21.37.124:8000/api/v1/token"];
-  NSURLSession *session =[NSURLSession sharedSession];
-  __block NSString *err = @"no error";
-  __block NSString *res;
-  
-  NSURLSessionDataTask *dataTask =[session dataTaskWithURL:url completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
-    NSString *retStr = [[NSString alloc] initWithData:(NSData*)data encoding:NSUTF8StringEncoding];
-    res = retStr;
-    if (error != nil) {
-      err = [error localizedDescription];
-    }
-    //    NSLog(@"html = %@",retStr);
-    dispatch_semaphore_signal(semaphore);
-  }];
-  [dataTask resume];
-  dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
-  
-  return FBResponseWithObject(@{
-                                @"info":res,
-                                @"error":err
-                              });
-}*/
 
 @end

@@ -64,7 +64,6 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (BOOL)dismissWithError:(NSError **)error;
 
-- (BOOL)actionWithAction:(nullable NSString *)action error:(NSError **)error;
 /**
  Clicks on an alert button, if present
  

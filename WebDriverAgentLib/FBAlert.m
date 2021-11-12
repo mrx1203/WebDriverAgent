@@ -12,12 +12,10 @@
 #import "FBApplication.h"
 #import "FBConfiguration.h"
 #import "FBErrorBuilder.h"
-#import "FBSpringboardApplication.h"
 #import "FBLogger.h"
 #import "FBXCodeCompatibility.h"
 #import "XCElementSnapshot+FBHelpers.h"
 #import "XCUIApplication+FBAlert.h"
-#import "XCUICoordinate.h"
 #import "XCUIElement+FBClassChain.h"
 #import "XCUIElement+FBTap.h"
 #import "XCUIElement+FBTyping.h"
@@ -49,7 +47,15 @@
 
 - (BOOL)isPresent
 {
-  return nil != self.alertElement && self.alertElement.exists;
+  @try {
+    if (nil == self.alertElement) {
+      return NO;
+    }
+    [self.alertElement fb_takeSnapshot];
+    return YES;
+  } @catch (NSException *) {
+    return NO;
+  }
 }
 
 - (BOOL)notPresentWithError:(NSError **)error
@@ -59,11 +65,14 @@
           buildError:error];
 }
 
-- (BOOL)isSafariWebAlert
++ (BOOL)isSafariWebAlertWithSnapshot:(XCElementSnapshot *)snapshot
 {
-  return nil != self.alertElement
-    && self.alertElement.elementType == XCUIElementTypeOther
-    && [self.application.label isEqualToString:FB_SAFARI_APP_NAME];
+  if (snapshot.elementType != XCUIElementTypeOther) {
+    return NO;
+  }
+
+  XCElementSnapshot *application = [snapshot fb_parentMatchingType:XCUIElementTypeApplication];
+  return nil != application && [application.label isEqualToString:FB_SAFARI_APP_NAME];
 }
 
 - (NSString *)text
@@ -71,24 +80,30 @@
   if (!self.isPresent) {
     return nil;
   }
+
   NSMutableArray<NSString *> *resultText = [NSMutableArray array];
-  XCElementSnapshot *snapshot = self.alertElement.fb_cachedSnapshot ?: self.alertElement.fb_lastSnapshot;
+  XCElementSnapshot *snapshot = self.alertElement.lastSnapshot;
+  BOOL isSafariAlert = [self.class isSafariWebAlertWithSnapshot:snapshot];
   [snapshot enumerateDescendantsUsingBlock:^(XCElementSnapshot *descendant) {
     XCUIElementType elementType = descendant.elementType;
     if (!(elementType == XCUIElementTypeTextView || elementType == XCUIElementTypeStaticText)) {
       return;
     }
 
-    if (elementType == XCUIElementTypeTextView
-        && [descendant fb_descendantsMatchingType:XCUIElementTypeStaticText].count > 0) {
-      return;
-    }
     if (elementType == XCUIElementTypeStaticText
         && nil != [descendant fb_parentMatchingType:XCUIElementTypeButton]) {
       return;
     }
 
     NSString *text = descendant.wdLabel ?: descendant.wdValue;
+    if (isSafariAlert && nil != descendant.parent) {
+      NSString *parentText = descendant.parent.wdLabel ?: descendant.parent.wdValue;
+      if ([parentText isEqualToString:text]) {
+        // Avoid duplicated texts on Safari alerts
+        return;
+      }
+    }
+
     if (nil != text) {
       [resultText addObject:[NSString stringWithFormat:@"%@", text]];
     }
@@ -101,7 +116,7 @@
   if (!self.isPresent) {
     return [self notPresentWithError:error];
   }
-  
+
   NSPredicate *textCollectorPredicate = [NSPredicate predicateWithFormat:@"elementType IN {%lu,%lu}",
                                          XCUIElementTypeTextField, XCUIElementTypeSecureTextField];
   NSArray<XCUIElement *> *dstFields = [[self.alertElement descendantsMatchingType:XCUIElementTypeAny]
@@ -116,9 +131,9 @@
              withDescriptionFormat:@"The alert contains no input fields"]
             buildError:error];
   }
-  // ignore possible clear errors
-  [dstFields.firstObject fb_clearTextWithError:nil];
-  return [dstFields.firstObject fb_typeText:text error:error];
+  return [dstFields.firstObject fb_typeText:text
+                                shouldClear:YES
+                                      error:error];
 }
 
 - (NSArray *)buttonLabels
@@ -128,8 +143,7 @@
   }
 
   NSMutableArray<NSString *> *labels = [NSMutableArray array];
-  XCElementSnapshot *snapshot = self.alertElement.fb_cachedSnapshot ?: self.alertElement.fb_lastSnapshot;
-  [snapshot enumerateDescendantsUsingBlock:^(XCElementSnapshot *descendant) {
+  [self.alertElement.lastSnapshot enumerateDescendantsUsingBlock:^(XCElementSnapshot *descendant) {
     if (descendant.elementType != XCUIElementTypeButton) {
       return;
     }
@@ -147,6 +161,7 @@
     return [self notPresentWithError:error];
   }
 
+  XCElementSnapshot *alertSnapshot = self.alertElement.lastSnapshot;
   XCUIElement *acceptButton = nil;
   if (FBConfiguration.acceptAlertButtonSelector.length) {
     NSString *errorReason = nil;
@@ -168,7 +183,7 @@
   if (nil == acceptButton) {
     NSArray<XCUIElement *> *buttons = [self.alertElement.fb_query
                                        descendantsMatchingType:XCUIElementTypeButton].allElementsBoundByIndex;
-    acceptButton = (self.alertElement.elementType == XCUIElementTypeAlert || [self isSafariWebAlert])
+    acceptButton = (alertSnapshot.elementType == XCUIElementTypeAlert || [self.class isSafariWebAlertWithSnapshot:alertSnapshot])
       ? buttons.lastObject
       : buttons.firstObject;
   }
@@ -185,6 +200,7 @@
     return [self notPresentWithError:error];
   }
 
+  XCElementSnapshot *alertSnapshot = self.alertElement.lastSnapshot;
   XCUIElement *dismissButton = nil;
   if (FBConfiguration.dismissAlertButtonSelector.length) {
     NSString *errorReason = nil;
@@ -206,7 +222,7 @@
   if (nil == dismissButton) {
     NSArray<XCUIElement *> *buttons = [self.alertElement.fb_query
                                        descendantsMatchingType:XCUIElementTypeButton].allElementsBoundByIndex;
-    dismissButton = (self.alertElement.elementType == XCUIElementTypeAlert || [self isSafariWebAlert])
+    dismissButton = (alertSnapshot.elementType == XCUIElementTypeAlert || [self.class isSafariWebAlertWithSnapshot:alertSnapshot])
       ? buttons.firstObject
       : buttons.lastObject;
   }
@@ -215,60 +231,6 @@
         withDescriptionFormat:@"Failed to find dismiss button for alert: %@", self.alertElement]
      buildError:error]
     : [dismissButton fb_tapWithError:error];
-}
-
-- (BOOL)actionWithAction:(NSString *)action error:(NSError **)error {
-  NSArray<NSDictionary *> *actions = (id)action;
-  for (NSDictionary *act in actions) {
-    BOOL match = NO;
-    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"SELF MATCHES %@", act[@"regex"]];
-    for (NSString *s in [self.text componentsSeparatedByString:@"\n"]) {
-      match = [predicate evaluateWithObject:s];
-      if (match) {
-        break;
-      }
-    }
-    if (match) {
-      XCUIElement *dismissButton = nil;
-      if (nil == dismissButton) {
-        NSArray<XCUIElement *> *buttons = [self.alertElement.fb_query
-                                           descendantsMatchingType:XCUIElementTypeButton].allElementsBoundByIndex;
-        NSString *errorReason = nil;
-        @try {
-          if (act[@"btns"]) {
-            NSArray<NSString *> *btns = act[@"btns"];
-            for (XCUIElement *btn in buttons) {
-              for (NSString *title in btns) {
-                NSPredicate *btnPredicate = [NSPredicate predicateWithFormat:@"SELF MATCHES %@", title];
-                if ([btnPredicate evaluateWithObject:btn.wdLabel]) {
-                  dismissButton = btn;
-                  break;
-                }
-              }
-              if (dismissButton) {
-                break;
-              }
-            }
-          } else {
-            dismissButton = (self.alertElement.elementType == XCUIElementTypeAlert || [self isSafariWebAlert])
-              ? [buttons objectAtIndex:[act[@"index"] integerValue]]
-            : [buttons objectAtIndex:(buttons.count - [act[@"index"] integerValue] - 1)];
-          }
-        } @catch (NSException *ex) {
-          errorReason = ex.reason;
-        }
-        if (nil == dismissButton) {
-          [FBLogger logFmt:@"Original error: %@", errorReason];
-        }
-      }
-      return nil == dismissButton
-        ? [[[FBErrorBuilder builder]
-            withDescriptionFormat:@"Failed to find dismiss button for alert: %@", self.alertElement]
-         buildError:error]
-        : [dismissButton fb_tapWithError:error];
-    }
-  }
-  return YES;
 }
 
 - (BOOL)clickAlertButton:(NSString *)label error:(NSError **)error
@@ -291,7 +253,16 @@
 - (XCUIElement *)alertElement
 {
   if (nil == self.element) {
-    self.element = self.application.fb_alertElement ?: [FBSpringboardApplication fb_springboard].fb_alertElement;
+    self.element = self.application.fb_alertElement;
+    if (nil == self.element) {
+      FBApplication *systemApp = FBApplication.fb_systemApplication;
+      for (FBApplication *activeApp in FBApplication.fb_activeApplications) {
+        if (systemApp.processID == activeApp.processID) {
+          self.element = activeApp.fb_alertElement;
+          break;
+        }
+      }
+    }
   }
   return self.element;
 }

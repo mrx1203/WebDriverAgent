@@ -12,7 +12,7 @@
 #import "FBMacros.h"
 #import "XCUIApplication+FBTouchAction.h"
 #import "XCUIElement+FBUtilities.h"
-#import "XCUIApplicationProcessQuiescence.h"
+
 
 #if !TARGET_OS_TV
 @implementation XCUIElement (FBTap)
@@ -20,30 +20,16 @@
 - (BOOL)fb_tapWithError:(NSError **)error
 {
   if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"13.0")) {
-    // Tap coordinates calculation issues have been fixed
-    // for different device orientations since Xcode 11
-    // however, [self tap] calls XCTest quiescence validation before and after the operation which doesn't play nice with animations
-    // therfore, disabling animation check and waiting for stability manually
-    // see https://github.com/appium/WebDriverAgent/pull/278
-    [self fb_waitUntilFrameIsStable];
-    [XCUIApplicationProcessQuiescence setAnimationCheckEnabled:NO];
     [self tap];
-    [XCUIApplicationProcessQuiescence setAnimationCheckEnabled:YES];
     return YES;
   }
 
-  CGRect frame = self.frame;
   NSArray<NSDictionary<NSString *, id> *> *tapGesture =
   @[
     @{@"action": @"tap",
-      @"options": @{
-          @"element": self,
-          @"x":@(frame.origin.x+frame.size.width/2),
-          @"y":@(frame.origin.y+frame.size.height/2)
-        }
+      @"options": @{@"element": self}
       }
     ];
-  [self fb_waitUntilFrameIsStable];
   return [self.application fb_performAppiumTouchActions:tapGesture elementCache:nil error:error];
 }
 
@@ -68,7 +54,6 @@
                     }
       }
     ];
-  [self fb_waitUntilFrameIsStable];
   return [self.application fb_performAppiumTouchActions:tapGesture elementCache:nil error:error];
 }
 

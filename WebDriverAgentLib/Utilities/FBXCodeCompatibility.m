@@ -11,7 +11,6 @@
 
 #import "FBConfiguration.h"
 #import "FBErrorBuilder.h"
-#import "FBExceptionHandler.h"
 #import "FBLogger.h"
 #import "XCUIApplication+FBHelpers.h"
 #import "XCUIElementQuery.h"
@@ -106,22 +105,19 @@ static dispatch_once_t onceAppWithPIDToken;
 
 @implementation XCUIElementQuery (FBCompatibility)
 
-- (XCElementSnapshot *)fb_cachedSnapshot
+- (BOOL)fb_isUniqueSnapshotSupported
 {
   static dispatch_once_t onceToken;
   static BOOL isUniqueMatchingSnapshotAvailable;
   dispatch_once(&onceToken, ^{
     isUniqueMatchingSnapshotAvailable = [self respondsToSelector:@selector(uniqueMatchingSnapshotWithError:)];
   });
-  if (!isUniqueMatchingSnapshotAvailable) {
-    return nil;
-  }
-  NSError *error;
-  XCElementSnapshot *result = [self uniqueMatchingSnapshotWithError:&error];
-  if (nil == result && nil != error) {
-    [FBLogger logFmt:@"%@", error.description];
-  }
-  return result;
+  return isUniqueMatchingSnapshotAvailable;
+}
+
+- (XCElementSnapshot *)fb_uniqueSnapshotWithError:(NSError **)error
+{
+  return [self uniqueMatchingSnapshotWithError:error];
 }
 
 - (XCUIElement *)fb_firstMatch
@@ -139,38 +135,30 @@ static dispatch_once_t onceAppWithPIDToken;
     : self.allElementsBoundByAccessibilityElement;
 }
 
-- (XCElementSnapshot *)fb_elementSnapshotForDebugDescription
-{
-  if ([self respondsToSelector:@selector(elementSnapshotForDebugDescription)]) {
-    return [self elementSnapshotForDebugDescription];
-  }
-  if ([self respondsToSelector:@selector(elementSnapshotForDebugDescriptionWithNoMatchesMessage:)]) {
-    return [self elementSnapshotForDebugDescriptionWithNoMatchesMessage:nil];
-  }
-  @throw [[FBErrorBuilder.builder withDescription:@"Cannot retrieve element snapshots for debug description. Please contact Appium developers"] build];
-  return nil;
-}
-
 @end
 
 
 @implementation XCUIElement (FBCompatibility)
 
-- (void)fb_nativeResolve
+- (BOOL)fb_resolveWithError:(NSError **)error
 {
-  if ([self respondsToSelector:@selector(resolve)]) {
-    [self resolve];
-    return;
-  }
-  if ([self respondsToSelector:@selector(resolveOrRaiseTestFailure)]) {
-    @try {
+  @try {
+    // The order here matters
+    if ([self respondsToSelector:@selector(resolveOrRaiseTestFailure)]) {
       [self resolveOrRaiseTestFailure];
-    } @catch (NSException *e) {
-      [FBLogger logFmt:@"Failure while resolving '%@': %@", self.description, e.reason];
+      return YES;
+    } else if ([self respondsToSelector:@selector(resolve:)]) {
+      return [self resolve:error];
+    } else if ([self respondsToSelector:@selector(resolve)]) {
+      [self resolve];
+      return nil != self.lastSnapshot;
     }
-    return;
+  } @catch (NSException *e) {
+    if (nil != e.reason) {
+      return [[FBErrorBuilder.builder withDescription:(NSString *)e.reason] buildError:error];
+    }
   }
-  @throw [[FBErrorBuilder.builder withDescription:@"Cannot resolve elements. Please contact Appium developers"] build];
+  return [[FBErrorBuilder.builder withDescription:@"Cannot find a matching method to resolve elements. Please contact Appium developers"] buildError:error];
 }
 
 + (BOOL)fb_supportsNonModalElementsInclusion
@@ -190,16 +178,6 @@ static dispatch_once_t onceAppWithPIDToken;
     : self.query;
 }
 
-+ (BOOL)fb_isSdk11SnapshotApiSupported
-{
-  static dispatch_once_t newSnapshotIsSupported;
-  static BOOL result;
-  dispatch_once(&newSnapshotIsSupported, ^{
-    result = [(id)[FBXCTestDaemonsProxy testRunnerProxy] respondsToSelector:@selector(_XCT_requestSnapshotForElement:attributes:parameters:reply:)];
-  });
-  return result;
-}
-
 @end
 
 @implementation XCPointerEvent (FBXcodeCompatibility)
@@ -215,3 +193,19 @@ static dispatch_once_t onceAppWithPIDToken;
 }
 
 @end
+
+NSInteger FBTestmanagerdVersion(void)
+{
+  static dispatch_once_t getTestmanagerdVersion;
+  static NSInteger testmanagerdVersion;
+  dispatch_once(&getTestmanagerdVersion, ^{
+    id<XCTestManager_ManagerInterface> proxy = [FBXCTestDaemonsProxy testRunnerProxy];
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    [proxy _XCT_exchangeProtocolVersion:testmanagerdVersion reply:^(unsigned long long code) {
+      testmanagerdVersion = (NSInteger) code;
+      dispatch_semaphore_signal(sem);
+    }];
+    dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)));
+  });
+  return testmanagerdVersion;
+}

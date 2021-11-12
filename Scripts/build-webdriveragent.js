@@ -6,7 +6,7 @@ const { exec } = require('teen_process');
 const xcode = require('appium-xcode');
 
 const log = new logger.getLogger('WDABuild');
-const rootDir = path.resolve(__dirname, '..', '..');
+const rootDir = path.resolve(__dirname, '..');
 
 async function buildWebDriverAgent (xcodeVersion) {
   // Get Xcode version
@@ -25,7 +25,6 @@ async function buildWebDriverAgent (xcodeVersion) {
   }
 
   // Clean and build
-  await exec('npx', ['gulp', 'clean:carthage']);
   log.info('Running ./Scripts/build.sh');
   let env = {TARGET: 'runner', SDK: 'sim'};
   try {

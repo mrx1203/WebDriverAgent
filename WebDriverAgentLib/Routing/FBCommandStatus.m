@@ -127,6 +127,7 @@ static NSString *const FB_NO_SUCH_DRIVER_MSG = @"A session is either terminated 
                                         message:message ?: FB_UNKNOWN_ERROR_MSG
                                       traceback:traceback];
 }
+
 + (instancetype)unsupportedOperationErrorWithMessage:(NSString *)message
                                            traceback:(NSString *)traceback
 {

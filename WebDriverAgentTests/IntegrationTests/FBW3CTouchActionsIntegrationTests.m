@@ -388,8 +388,7 @@
                    timeout:2.0]
                   timeoutErrorMessage:@"Picker wheel value has not been changed after 2 seconds timeout"]
                  spinUntilTrue:^BOOL{
-                   [self.pickerWheel fb_nativeResolve];
-                   return ![self.pickerWheel.value isEqualToString:previousValue];
+                   return ![self.pickerWheel.fb_takeSnapshot.value isEqualToString:previousValue];
                  }
                  error:&error]);
   XCTAssertNil(error);
@@ -406,8 +405,7 @@
       @"actions": @[
           @{@"type": @"pointerMove", @"duration": @0, @"origin": self.pickerWheel, @"x": @0, @"y":@0},
           @{@"type": @"pointerDown"},
-          @{@"type": @"pause", @"duration": @500},
-          @{@"type": @"pointerMove", @"duration": @0, @"origin": self.pickerWheel, @"x": @0, @"y": @(pickerFrame.size.height / 2)},
+          @{@"type": @"pointerMove", @"duration": @500, @"origin": self.pickerWheel, @"x": @0, @"y": @(pickerFrame.size.height / 2)},
           @{@"type": @"pointerUp"},
           ],
       },
@@ -426,8 +424,7 @@
       @"actions": @[
           @{@"type": @"pointerMove", @"duration": @250, @"origin": self.pickerWheel, @"x": @0, @"y": @0},
           @{@"type": @"pointerDown"},
-          @{@"type": @"pause", @"duration": @500},
-          @{@"type": @"pointerMove", @"duration": @0, @"origin": @"pointer", @"x": @0, @"y": @(-pickerFrame.size.height / 2)},
+          @{@"type": @"pointerMove", @"duration": @500, @"origin": @"pointer", @"x": @0, @"y": @(-pickerFrame.size.height / 2)},
           @{@"type": @"pointerUp"},
           ],
       },
@@ -446,8 +443,7 @@
       @"actions": @[
           @{@"type": @"pointerMove", @"duration": @0, @"x": @(pickerFrame.origin.x + pickerFrame.size.width / 2), @"y": @(pickerFrame.origin.y + pickerFrame.size.height / 2)},
           @{@"type": @"pointerDown"},
-          @{@"type": @"pause", @"duration": @500},
-          @{@"type": @"pointerMove", @"duration": @0, @"origin": @"pointer", @"x": @0, @"y": @(pickerFrame.size.height / 2)},
+          @{@"type": @"pointerMove", @"duration": @500, @"origin": @"pointer", @"x": @0, @"y": @(pickerFrame.size.height / 2)},
           @{@"type": @"pointerUp"},
           ],
       },
