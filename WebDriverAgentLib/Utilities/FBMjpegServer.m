@@ -19,14 +19,13 @@
 #import "FBScreenshot.h"
 #import "FBImageIOScaler.h"
 #import "XCUIScreen.h"
-
 #import "XCTestManager_ManagerInterface-Protocol.h"
 #import "FBXCTestDaemonsProxy.h"
-
 #import "XCAXClient_iOS.h"
 #import "FBMacros.h"
 
 static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.1;
+
 static const NSUInteger MAX_FPS = 60;
 static const NSTimeInterval FRAME_TIMEOUT = 1.;
 
@@ -40,7 +39,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
 @property (nonatomic, readonly) NSMutableArray<GCDAsyncSocket *> *listeningClients;
 @property (nonatomic, readonly) mach_timebase_info_data_t timebaseInfo;
 @property (nonatomic, readonly) FBImageIOScaler *imageScaler;
-@property (nonatomic, readonly) unsigned int mainScreenID;
+@property (nonatomic, readonly) long long mainScreenID;
 
 @end
 
@@ -95,44 +94,22 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
       return;
     }
   }
-  
   __block NSData *screenshotData = nil;
   
   CGFloat scalingFactor = [FBConfiguration mjpegScalingFactor] / 100.0f;
   BOOL usesScaling = fabs(FBMaxScalingFactor - scalingFactor) > DBL_EPSILON;
-  
   CGFloat compressionQuality = FBConfiguration.mjpegServerScreenshotQuality / 100.0f;
   // If scaling is applied we perform another JPEG compression after scaling
   // To get the desired compressionQuality we need to do a lossless compression here
   CGFloat screenshotCompressionQuality = usesScaling ? FBMaxCompressionQuality : compressionQuality;
-  
-  id<XCTestManager_ManagerInterface> proxy = [FBXCTestDaemonsProxy testRunnerProxy];
-  dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-  if (SYSTEM_VERSION_LESS_THAN(@"11.0")){
-    id xcScreen = NSClassFromString((@"XCUIScreen"));
-    if(xcScreen){
-      screenshotData = [xcScreen valueForKeyPath:@"mainScreen.screenshot.PNGRepresentation"];
-    }
-    else{
-      screenshotData = [[XCAXClient_iOS sharedClient] screenshotData];
-    }
-    UIImage *img = [UIImage imageWithData:screenshotData];
-    screenshotData = UIImageJPEGRepresentation(img, 0.5);
-    dispatch_semaphore_signal(sem);
-  }
-  else{
-    NSError *error;
-    screenshotData = [FBScreenshot takeInOriginalResolutionWithScreenID:self.mainScreenID
-                                                               compressionQuality:screenshotCompressionQuality
-                                                                              uti:(__bridge id)kUTTypeJPEG
-                                                                          timeout:FRAME_TIMEOUT
-                                                                            error:&error];
-    if (nil == screenshotData) {
-      [FBLogger logFmt:@"%@", error.description];
-    }
-  }
-  dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SCREENSHOT_TIMEOUT * NSEC_PER_SEC)));
+  NSError *error;
+  NSData *screenshotData = [FBScreenshot takeInOriginalResolutionWithScreenID:self.mainScreenID
+                                                           compressionQuality:screenshotCompressionQuality
+                                                                          uti:(__bridge id)kUTTypeJPEG
+                                                                      timeout:FRAME_TIMEOUT
+                                                                        error:&error];
   if (nil == screenshotData) {
+    [FBLogger logFmt:@"%@", error.description];
     [self scheduleNextScreenshotWithInterval:timerInterval timeStarted:timeStarted];
     return;
   }

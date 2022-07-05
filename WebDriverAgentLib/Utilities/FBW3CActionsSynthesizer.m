@@ -21,6 +21,7 @@
 #import "FBXCTestDaemonsProxy.h"
 #import "XCElementSnapshot+FBHelpers.h"
 #import "XCUIApplication+FBHelpers.h"
+#import "XCUIDevice.h"
 #import "XCUIElement+FBCaching.h"
 #import "XCUIElement+FBIsVisible.h"
 #import "XCUIElement+FBUtilities.h"
@@ -218,12 +219,28 @@ static NSString *const FB_KEY_ACTIONS = @"actions";
       return @[];
     }
   }
-  XCPointerEventPath *result = [[XCPointerEventPath alloc] initForTouchAtPoint:self.atPosition offset:FBMillisToSeconds(self.offset)];
-  if (nil != self.pressure && nil != result.pointerEvents.lastObject) {
-    XCPointerEvent *pointerEvent = (XCPointerEvent *)result.pointerEvents.lastObject;
-    pointerEvent.pressure = self.pressure.doubleValue;
+  if (nil == self.pressure) {
+    XCPointerEventPath *result = [[XCPointerEventPath alloc] initForTouchAtPoint:self.atPosition
+                                                                          offset:FBMillisToSeconds(self.offset)];
+    return @[result];
   }
-  return @[result];
+
+  if (nil == eventPath) {
+    NSString *description = [NSString stringWithFormat:@"'%@' action with pressure must be preceeded with at least one '%@' action without this option", self.class.actionName, self.class.actionName];
+    if (error) {
+      *error = [[FBErrorBuilder.builder withDescription:description] build];
+    }
+    return nil;
+  }
+  if (![XCUIDevice sharedDevice].supportsPressureInteraction) {
+    if (error) {
+      *error = [[FBErrorBuilder.builder withDescription:@"This device does not support force press interactions"] build];
+    }
+    return nil;
+  }
+  [eventPath pressDownWithPressure:self.pressure.doubleValue
+                          atOffset:FBMillisToSeconds(self.offset)];
+  return @[];
 }
 
 @end
@@ -317,21 +334,7 @@ static NSString *const FB_KEY_ACTIONS = @"actions";
                                  currentItemIndex:(NSUInteger)currentItemIndex
                                             error:(NSError **)error
 {
-  if (nil != eventPath) {
-    if (0 == currentItemIndex) {
-      return @[];
-    }
-    FBBaseGestureItem *preceedingItem = [allItems objectAtIndex:currentItemIndex - 1];
-    if (![preceedingItem isKindOfClass:FBPointerUpItem.class] && currentItemIndex < allItems.count - 1) {
-      return @[];
-    }
-  }
-  NSTimeInterval currentOffset = FBMillisToSeconds(self.offset + self.duration);
-  XCPointerEventPath *result = [[XCPointerEventPath alloc] initForTouchAtPoint:self.atPosition offset:currentOffset];
-  if (currentItemIndex == allItems.count - 1) {
-    [result liftUpAtOffset:currentOffset];
-  }
-  return @[result];
+  return @[];
 }
 
 @end
@@ -519,22 +522,10 @@ static NSString *const FB_KEY_ACTIONS = @"actions";
   // TODO: The current approach throws zero division error on execution
   // NSUInteger modifiers = [self collectModifersWithItems:allItems currentItemIndex:currentItemIndex];
   // [resultPath setModifiers:modifiers mergeWithCurrentModifierFlags:NO atOffset:0];
-  if ([resultPath respondsToSelector:@selector(typeText:atOffset:typingSpeed:)]) {
-    [resultPath typeText:text
-                atOffset:offset
-             typingSpeed:FBConfiguration.maxTypingFrequency];
-  } else if ([resultPath respondsToSelector:@selector(typeText:atOffset:typingSpeed:shouldRedact:)]) {
-    [resultPath typeText:text
-                atOffset:offset
-             typingSpeed:FBConfiguration.maxTypingFrequency
-            shouldRedact:YES];
-  } else {
-    NSString *description = @"typeText: selector signature has been unexpectedly changed in the current XCTest SDK. Consider switching to the most recent WDA version";
-    if (error) {
-      *error = [[FBErrorBuilder.builder withDescription:description] build];
-    }
-    return nil;
-  }
+  [resultPath typeText:text
+              atOffset:offset
+           typingSpeed:FBConfiguration.maxTypingFrequency
+          shouldRedact:YES];
   return @[resultPath];
 }
 
