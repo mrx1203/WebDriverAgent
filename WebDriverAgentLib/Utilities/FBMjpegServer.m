@@ -19,10 +19,6 @@
 #import "FBScreenshot.h"
 #import "FBImageIOScaler.h"
 #import "XCUIScreen.h"
-#import "XCTestManager_ManagerInterface-Protocol.h"
-#import "FBXCTestDaemonsProxy.h"
-#import "XCAXClient_iOS.h"
-#import "FBMacros.h"
 
 static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.1;
 
@@ -84,7 +80,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
     [FBLogger log:@"MJPEG server cannot start because the current iOS version is not supported"];
     return;
   }
-  
+
   NSUInteger framerate = FBConfiguration.mjpegServerFramerate;
   uint64_t timerInterval = (uint64_t)(1.0 / ((0 == framerate || framerate > MAX_FPS) ? MAX_FPS : framerate) * NSEC_PER_SEC);
   uint64_t timeStarted = mach_absolute_time();
@@ -94,8 +90,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
       return;
     }
   }
-  __block NSData *screenshotData = nil;
-  
+
   CGFloat scalingFactor = [FBConfiguration mjpegScalingFactor] / 100.0f;
   BOOL usesScaling = fabs(FBMaxScalingFactor - scalingFactor) > DBL_EPSILON;
   CGFloat compressionQuality = FBConfiguration.mjpegServerScreenshotQuality / 100.0f;
@@ -113,7 +108,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
     [self scheduleNextScreenshotWithInterval:timerInterval timeStarted:timeStarted];
     return;
   }
-  
+
   if (usesScaling) {
     [self.imageScaler submitImage:screenshotData
                               uti:(__bridge id)kUTTypeJPEG
@@ -125,7 +120,6 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
   } else {
     [self sendScreenshot:screenshotData];
   }
-  
   [self scheduleNextScreenshotWithInterval:timerInterval timeStarted:timeStarted];
 }
 
