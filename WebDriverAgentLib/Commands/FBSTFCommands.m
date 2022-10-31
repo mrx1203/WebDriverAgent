@@ -12,7 +12,6 @@
 #import "FBApplication.h"
 #import "FBConfiguration.h"
 #import "FBKeyboard.h"
-#import "FBPredicate.h"
 #import "FBRoute.h"
 #import "FBRouteRequest.h"
 #import "FBRunLoopSpinner.h"
