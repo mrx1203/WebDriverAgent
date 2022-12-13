@@ -8,6 +8,10 @@
  */
 
 #import "FBScreenshotCommands.h"
+#import "FBScreenshot.h"
+#import "XCUIScreen.h"
+
+#import <MobileCoreServices/MobileCoreServices.h>
 
 #import "XCUIDevice+FBHelpers.h"
 
@@ -30,7 +34,12 @@
 + (id<FBResponsePayload>)handleGetScreenshot:(FBRouteRequest *)request
 {
   NSError *error;
-  NSData *screenshotData = [[XCUIDevice sharedDevice] fb_screenshotWithError:&error];
+  long long mainScreenID = [XCUIScreen.mainScreen displayID];
+  NSData *screenshotData = [FBScreenshot takeInOriginalResolutionWithScreenID:mainScreenID
+                                                           compressionQuality:0.6
+                                                                          uti:(__bridge id)kUTTypeJPEG
+                                                                      timeout:1
+                                                                        error:&error];
   if (nil == screenshotData) {
     return FBResponseWithStatus([FBCommandStatus unableToCaptureScreenErrorWithMessage:error.description traceback:nil]);
   }
