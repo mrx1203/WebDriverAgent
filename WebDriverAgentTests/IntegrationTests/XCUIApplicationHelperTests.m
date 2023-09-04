@@ -14,6 +14,7 @@
 #import "FBApplication.h"
 #import "FBIntegrationTestCase.h"
 #import "FBElement.h"
+#import "FBMacros.h"
 #import "FBTestMacros.h"
 #import "XCUIApplication+FBHelpers.h"
 #import "XCUIElement+FBIsVisible.h"
@@ -46,10 +47,10 @@
 - (void)testDeactivateApplication
 {
   NSError *error;
-  uint64_t timeStarted = mach_absolute_time();
+  uint64_t timeStarted = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
   NSTimeInterval backgroundDuration = 5.0;
   XCTAssertTrue([self.testedApplication fb_deactivateWithDuration:backgroundDuration error:&error]);
-  NSTimeInterval timeElapsed = (mach_absolute_time() - timeStarted) / NSEC_PER_SEC;
+  NSTimeInterval timeElapsed = (clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - timeStarted) / NSEC_PER_SEC;
   XCTAssertNil(error);
   XCTAssertEqualWithAccuracy(timeElapsed, backgroundDuration, 3.0);
   XCTAssertTrue(self.testedApplication.buttons[@"Alerts"].exists);
@@ -92,6 +93,26 @@
 - (void)testTestmanagerdVersion
 {
   XCTAssertGreaterThan(FBTestmanagerdVersion(), 0);
+}
+
+- (void)testAccessbilityAudit
+{
+  if (SYSTEM_VERSION_LESS_THAN(@"17.0")) {
+    return;
+  }
+
+  NSError *error;
+  NSArray *auditIssues1 = [FBApplication.fb_activeApplication fb_performAccessibilityAuditWithAuditTypes:~0UL
+                                                                                                   error:&error];
+  XCTAssertNotNil(auditIssues1);
+  XCTAssertNil(error);
+
+  NSMutableSet *set = [NSMutableSet new];
+  [set addObject:@"XCUIAccessibilityAuditTypeAll"];
+  NSArray *auditIssues2 = [FBApplication.fb_activeApplication fb_performAccessibilityAuditWithAuditTypesSet:set.copy
+                                                                                                      error:&error];
+  XCTAssertEqualObjects(auditIssues1, auditIssues2);
+  XCTAssertNil(error);
 }
 
 @end

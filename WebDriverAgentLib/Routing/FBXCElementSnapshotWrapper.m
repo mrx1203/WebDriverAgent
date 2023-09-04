@@ -9,7 +9,7 @@
 
 #import "FBXCElementSnapshotWrapper.h"
 
-#import <objc/runtime.h>
+#import "FBElementUtils.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-protocol-property-synthesis"
@@ -33,11 +33,81 @@
     : [[FBXCElementSnapshotWrapper alloc] initWithSnapshot:snapshot];
 }
 
+// Attributes are queried most often,
+// so we prefer them to have direct accessors defined here
+// rather than to use message forwarding via forwardingTargetForSelector,
+// which is slow
+
+- (NSString *)identifier
+{
+  return self.snapshot.identifier;
+}
+
+- (CGRect)frame
+{
+  return self.snapshot.frame;
+}
+
+- (id)value
+{
+  return self.snapshot.value;
+}
+
+- (NSString *)title
+{
+  return self.snapshot.title;
+}
+
+- (NSString *)label
+{
+  return self.snapshot.label;
+}
+
+- (XCUIElementType)elementType
+{
+  return self.snapshot.elementType;
+}
+
+- (BOOL)isEnabled
+{
+  return self.snapshot.enabled;
+}
+
+- (XCUIUserInterfaceSizeClass)horizontalSizeClass
+{
+  return self.snapshot.horizontalSizeClass;
+}
+
+- (XCUIUserInterfaceSizeClass)verticalSizeClass
+{
+  return self.snapshot.verticalSizeClass;
+}
+
+- (NSString *)placeholderValue
+{
+  return self.snapshot.placeholderValue;
+}
+
+- (BOOL)isSelected
+{
+  return self.snapshot.selected;
+}
+
+#if !TARGET_OS_OSX
+- (BOOL)hasFocus
+{
+  return self.snapshot.hasFocus;
+}
+#endif
+
 - (id)forwardingTargetForSelector:(SEL)aSelector
 {
-  struct objc_method_description descr = protocol_getMethodDescription(@protocol(FBXCElementSnapshot), aSelector, YES, YES);
-  SEL selector = descr.name;
-  return nil == selector ? nil : self.snapshot;
+  static dispatch_once_t onceToken;
+  static NSSet<NSString *> *names;
+  dispatch_once(&onceToken, ^{
+    names = [FBElementUtils selectorNamesWithProtocol:@protocol(FBXCElementSnapshot)];
+  });
+  return [names containsObject:NSStringFromSelector(aSelector)] ? self.snapshot : nil;
 }
 
 @end

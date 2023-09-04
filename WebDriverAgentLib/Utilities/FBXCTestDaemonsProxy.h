@@ -8,25 +8,32 @@
  */
 
 #import <XCTest/XCTest.h>
+
+#if !TARGET_OS_TV
+#import <CoreLocation/CoreLocation.h>
+#endif
+
 #import "XCSynthesizedEventRecord.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @protocol XCTestManager_ManagerInterface;
 
-/**
- Temporary class used to abstract interactions with TestManager daemon between Xcode 8.2.1 and Xcode 8.3-beta
- */
 @interface FBXCTestDaemonsProxy : NSObject
 
 + (id<XCTestManager_ManagerInterface>)testRunnerProxy;
 
-#if !TARGET_OS_TV
-+ (UIInterfaceOrientation)orientationWithApplication:(XCUIApplication *)application;
-#endif
-
 + (BOOL)synthesizeEventWithRecord:(XCSynthesizedEventRecord *)record
                             error:(NSError *__autoreleasing*)error;
+
++ (BOOL)openURL:(NSURL *)url usingApplication:(NSString *)bundleId error:(NSError **)error;
++ (BOOL)openDefaultApplicationForURL:(NSURL *)url error:(NSError **)error;
+
+#if !TARGET_OS_TV
++ (BOOL)setSimulatedLocation:(CLLocation *)location error:(NSError **)error;
++ (nullable CLLocation *)getSimulatedLocation:(NSError **)error;
++ (BOOL)clearSimulatedLocation:(NSError **)error;
+#endif
 
 @end
 

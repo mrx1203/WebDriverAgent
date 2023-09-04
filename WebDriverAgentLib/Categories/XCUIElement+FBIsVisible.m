@@ -34,9 +34,9 @@
 
 @implementation FBXCElementSnapshotWrapper (FBIsVisible)
 
-- (NSString *)fb_uniqId
++ (NSString *)fb_uniqIdWithSnapshot:(id<FBXCElementSnapshot>)snapshot
 {
-  return self.fb_uid ?: [NSString stringWithFormat:@"%p", (void *)self];
+  return [FBXCElementSnapshotWrapper wdUIDWithSnapshot:snapshot] ?: [NSString stringWithFormat:@"%p", (void *)snapshot];
 }
 
 - (nullable NSNumber *)fb_cachedVisibilityValue
@@ -46,14 +46,14 @@
     return nil;
   }
 
-  NSDictionary<NSString *, NSNumber *> *result = [cache objectForKey:@(self.generation)];
+  NSDictionary<NSString *, NSNumber *> *result = cache[@(self.generation)];
   if (nil == result) {
     // There is no need to keep the cached data for the previous generations
     [cache removeAllObjects];
-    [cache setObject:[NSMutableDictionary dictionary] forKey:@(self.generation)];
+    cache[@(self.generation)] = [NSMutableDictionary dictionary];
     return nil;
   }
-  return [result objectForKey:self.fb_uniqId];
+  return result[[self.class fb_uniqIdWithSnapshot:self.snapshot]];
 }
 
 - (BOOL)fb_cacheVisibilityWithValue:(BOOL)isVisible
@@ -63,19 +63,19 @@
   if (nil == cache) {
     return isVisible;
   }
-  NSMutableDictionary<NSString *, NSNumber *> *destination = [cache objectForKey:@(self.generation)];
+  NSMutableDictionary<NSString *, NSNumber *> *destination = cache[@(self.generation)];
   if (nil == destination) {
     return isVisible;
   }
 
   NSNumber *visibleObj = [NSNumber numberWithBool:isVisible];
-  [destination setObject:visibleObj forKey:self.fb_uniqId];
+  destination[[self.class fb_uniqIdWithSnapshot:self.snapshot]] = visibleObj;
   if (isVisible && nil != ancestors) {
     // if an element is visible then all its ancestors must be visible as well
     for (id<FBXCElementSnapshot> ancestor in ancestors) {
-      NSString *ancestorId = [FBXCElementSnapshotWrapper ensureWrapped:ancestor].fb_uniqId;
-      if (nil == [destination objectForKey:ancestorId]) {
-        [destination setObject:visibleObj forKey:ancestorId];
+      NSString *ancestorId = [self.class fb_uniqIdWithSnapshot:ancestor];
+      if (nil == destination[ancestorId]) {
+        destination[ancestorId] = visibleObj;
       }
     }
   }
@@ -186,18 +186,6 @@
   }
   CGPoint midPoint = CGPointMake(visibleRect.origin.x + visibleRect.size.width / 2,
                                  visibleRect.origin.y + visibleRect.size.height / 2);
-#if !TARGET_OS_TV // TV has no orientation, so it does not need to coordinate
-  id<FBXCElementSnapshot> appElement = ancestors.count > 0 ? [ancestors lastObject] : self;
-  CGRect appFrame = appElement.frame;
-  CGRect windowFrame = nil == parentWindow ? selfFrame : parentWindow.frame;
-  if ((appFrame.size.height > appFrame.size.width && windowFrame.size.height < windowFrame.size.width) ||
-      (appFrame.size.height < appFrame.size.width && windowFrame.size.height > windowFrame.size.width)) {
-    // This is the indication of the fact that transformation is broken and coordinates should be
-    // recalculated manually.
-    // However, upside-down case cannot be covered this way, which is not important for Appium
-    midPoint = FBInvertPointForApplication(midPoint, appFrame.size, FBApplication.fb_activeApplication.interfaceOrientation);
-  }
-#endif
   id<FBXCAccessibilityElement> hitElement = [FBActiveAppDetectionPoint axElementWithPoint:midPoint];
   if (nil != hitElement) {
     if (FBIsAXElementEqualToOther(self.accessibilityElement, hitElement)) {

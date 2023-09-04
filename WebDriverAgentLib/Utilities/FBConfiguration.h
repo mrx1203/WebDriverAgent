@@ -49,9 +49,13 @@ extern NSString *const FBSnapshotMaxDepthKey;
 
 /*! Disables XCTest automated screenshots taking */
 + (void)disableScreenshots;
-
 /*! Enables XCTest automated screenshots taking */
 + (void)enableScreenshots;
+
+/*! Disables XCTest automated videos taking (iOS 17+) */
++ (void)disableScreenRecordings;
+/*! Enables XCTest automated videos taking  (iOS 17+) */
++ (void)enableScreenRecordings;
 
 /* The maximum typing frequency for all typing activities */
 + (void)setMaxTypingFrequency:(NSUInteger)value;
@@ -89,9 +93,9 @@ extern NSString *const FBSnapshotMaxDepthKey;
 + (void)setMjpegServerFramerate:(NSUInteger)framerate;
 
 /**
- The quality of phone display screenshots. The higher quality you set is the bigger screenshot size is.
- The highest quality value is 0 (lossless PNG). The lowest quality is 2 (highly compressed JPEG).
- The default quality value is 1 (high quality JPEG).
+ The quality of  display screenshots. The higher quality you set is the bigger screenshot size is.
+ The highest quality value is 0 (lossless PNG) or 3 (lossless HEIC). The lowest quality is 2 (highly compressed JPEG).
+ The default quality value is 3 (lossless HEIC).
  See https://developer.apple.com/documentation/xctest/xctimagequality?language=objc
  */
 + (NSUInteger)screenshotQuality;
@@ -182,13 +186,6 @@ typedef NS_ENUM(NSInteger, FBConfigurationKeyboardPreference) {
   @return The number of maximum depth for traversing elements tree
  */
 + (int)snapshotMaxDepth;
-
-/**
- Returns parameters for traversing elements tree from parents to children while requesting XCElementSnapshot.
-
- @return dictionary with parameters for element's snapshot request
-*/
-+ (NSDictionary *)snapshotRequestParameters;
 
 /**
  * Whether to use fast search result matching while searching for elements.
@@ -300,6 +297,11 @@ typedef NS_ENUM(NSInteger, FBConfigurationKeyboardPreference) {
 + (NSString *)humanReadableScreenshotOrientation;
 
 #endif
+
+/**
+ Resets all session-specific settings to their default values
+ */
++ (void)resetSessionSettings;
 
 @end
 

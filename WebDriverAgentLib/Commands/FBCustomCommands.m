@@ -52,10 +52,13 @@
     [[FBRoute GET:@"/wda/activeAppInfo"].withoutSession respondWithTarget:self action:@selector(handleActiveAppInfo:)],
 #if !TARGET_OS_TV // tvOS does not provide relevant APIs
     [[FBRoute POST:@"/wda/setPasteboard"] respondWithTarget:self action:@selector(handleSetPasteboard:)],
+    [[FBRoute POST:@"/wda/setPasteboard"].withoutSession respondWithTarget:self action:@selector(handleSetPasteboard:)],
     [[FBRoute POST:@"/wda/getPasteboard"] respondWithTarget:self action:@selector(handleGetPasteboard:)],
+    [[FBRoute POST:@"/wda/getPasteboard"].withoutSession respondWithTarget:self action:@selector(handleGetPasteboard:)],
     [[FBRoute GET:@"/wda/batteryInfo"] respondWithTarget:self action:@selector(handleGetBatteryInfo:)],
 #endif
     [[FBRoute POST:@"/wda/pressButton"] respondWithTarget:self action:@selector(handlePressButtonCommand:)],
+    [[FBRoute POST:@"/wda/performAccessibilityAudit"] respondWithTarget:self action:@selector(handlePerformAccessibilityAudit:)],
     [[FBRoute POST:@"/wda/performIoHidEvent"] respondWithTarget:self action:@selector(handlePeformIOHIDEvent:)],
     [[FBRoute POST:@"/wda/expectNotification"] respondWithTarget:self action:@selector(handleExpectNotification:)],
     [[FBRoute POST:@"/wda/siri/activate"] respondWithTarget:self action:@selector(handleActivateSiri:)],
@@ -66,6 +69,14 @@
     [[FBRoute POST:@"/wda/device/appearance"].withoutSession respondWithTarget:self action:@selector(handleSetDeviceAppearance:)],
     [[FBRoute GET:@"/wda/device/location"] respondWithTarget:self action:@selector(handleGetLocation:)],
     [[FBRoute GET:@"/wda/device/location"].withoutSession respondWithTarget:self action:@selector(handleGetLocation:)],
+#if !TARGET_OS_TV // tvOS does not provide relevant APIs
+    [[FBRoute GET:@"/wda/simulatedLocation"] respondWithTarget:self action:@selector(handleGetSimulatedLocation:)],
+    [[FBRoute GET:@"/wda/simulatedLocation"].withoutSession respondWithTarget:self action:@selector(handleGetSimulatedLocation:)],
+    [[FBRoute POST:@"/wda/simulatedLocation"] respondWithTarget:self action:@selector(handleSetSimulatedLocation:)],
+    [[FBRoute POST:@"/wda/simulatedLocation"].withoutSession respondWithTarget:self action:@selector(handleSetSimulatedLocation:)],
+    [[FBRoute DELETE:@"/wda/simulatedLocation"] respondWithTarget:self action:@selector(handleClearSimulatedLocation:)],
+    [[FBRoute DELETE:@"/wda/simulatedLocation"].withoutSession respondWithTarget:self action:@selector(handleClearSimulatedLocation:)],
+#endif
     [[FBRoute OPTIONS:@"/*"].withoutSession respondWithTarget:self action:@selector(handlePingCommand:)],
   ];
 }
@@ -106,9 +117,9 @@
   BOOL isDismissed = [request.session.activeApplication fb_dismissKeyboardWithKeyNames:request.arguments[@"keyNames"]
                                                                                  error:&error];
   return isDismissed
-    ? FBResponseWithOK()
-    : FBResponseWithStatus([FBCommandStatus invalidElementStateErrorWithMessage:error.description
-                                                                      traceback:nil]);
+  ? FBResponseWithOK()
+  : FBResponseWithStatus([FBCommandStatus invalidElementStateErrorWithMessage:error.description
+                                                                    traceback:nil]);
 }
 
 + (id<FBResponsePayload>)handlePingCommand:(FBRouteRequest *)request
@@ -123,12 +134,12 @@
   FBSession *session = request.session;
   CGSize statusBarSize = [FBScreen statusBarSizeForApplication:session.activeApplication];
   return FBResponseWithObject(
-  @{
+                              @{
     @"statusBarSize": @{@"width": @(statusBarSize.width),
                         @"height": @(statusBarSize.height),
-                        },
+    },
     @"scale": @([FBScreen scale]),
-    });
+  });
 }
 
 + (id<FBResponsePayload>)handleLock:(FBRouteRequest *)request
@@ -325,7 +336,7 @@
   CLAuthorizationStatus authStatus;
   if ([locationManager respondsToSelector:@selector(authorizationStatus)]) {
     NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:[[locationManager class]
-      instanceMethodSignatureForSelector:@selector(authorizationStatus)]];
+                                                                            instanceMethodSignatureForSelector:@selector(authorizationStatus)]];
     [invocation setSelector:@selector(authorizationStatus)];
     [invocation setTarget:locationManager];
     [invocation invoke];
@@ -379,8 +390,8 @@
   }
 
   FBUIInterfaceAppearance appearance = [name isEqualToString:@"light"]
-    ? FBUIInterfaceAppearanceLight
-    : FBUIInterfaceAppearanceDark;
+  ? FBUIInterfaceAppearanceLight
+  : FBUIInterfaceAppearanceDark;
   NSError *error;
   if (![XCUIDevice.sharedDevice fb_setAppearance:appearance error:&error]) {
     return FBResponseWithStatus([FBCommandStatus unknownErrorWithMessage:error.description
@@ -397,7 +408,7 @@
   NSString *currentLocale = [[NSLocale autoupdatingCurrentLocale] localeIdentifier];
 
   NSMutableDictionary *deviceInfo = [NSMutableDictionary dictionaryWithDictionary:
-  @{
+                                     @{
     @"currentLocale": currentLocale,
     @"timeZone": self.timeZone,
     @"name": UIDevice.currentDevice.name,
@@ -413,10 +424,8 @@
 #endif
   }];
 
-  if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.0")) {
-    // https://developer.apple.com/documentation/foundation/nsprocessinfothermalstate
-    deviceInfo[@"thermalState"] = @(NSProcessInfo.processInfo.thermalState);
-  }
+  // https://developer.apple.com/documentation/foundation/nsprocessinfothermalstate
+  deviceInfo[@"thermalState"] = @(NSProcessInfo.processInfo.thermalState);
 
   return FBResponseWithObject(deviceInfo);
 }
@@ -488,6 +497,71 @@
   }
 
   return [localTimeZone name];
+}
+
+#if !TARGET_OS_TV // tvOS does not provide relevant APIs
++ (id<FBResponsePayload>)handleGetSimulatedLocation:(FBRouteRequest *)request
+{
+  NSError *error;
+  CLLocation *location = [XCUIDevice.sharedDevice fb_getSimulatedLocation:&error];
+  if (nil != error) {
+    return FBResponseWithStatus([FBCommandStatus unknownErrorWithMessage:error.description
+                                                               traceback:nil]);
+  }
+  return FBResponseWithObject(@{
+    @"latitude": location ? @(location.coordinate.latitude) : NSNull.null,
+    @"longitude": location ? @(location.coordinate.longitude) : NSNull.null,
+    @"altitude": location ? @(location.altitude) : NSNull.null,
+  });
+}
+
++ (id<FBResponsePayload>)handleSetSimulatedLocation:(FBRouteRequest *)request
+{
+  NSNumber *longitude = request.arguments[@"longitude"];
+  NSNumber *latitude = request.arguments[@"latitude"];
+
+  if (nil == longitude || nil == latitude) {
+    return FBResponseWithStatus([FBCommandStatus invalidArgumentErrorWithMessage:@"Both latitude and longitude must be provided"
+                                                                       traceback:nil]);
+  }
+  NSError *error;
+  CLLocation *location = [[CLLocation alloc] initWithLatitude:latitude.doubleValue
+                                                    longitude:longitude.doubleValue];
+  if (![XCUIDevice.sharedDevice fb_setSimulatedLocation:location error:&error]) {
+    return FBResponseWithStatus([FBCommandStatus unknownErrorWithMessage:error.description
+                                                               traceback:nil]);
+  }
+  return FBResponseWithOK();
+}
+
++ (id<FBResponsePayload>)handleClearSimulatedLocation:(FBRouteRequest *)request
+{
+  NSError *error;
+  if (![XCUIDevice.sharedDevice fb_clearSimulatedLocation:&error]) {
+    return FBResponseWithStatus([FBCommandStatus unknownErrorWithMessage:error.description
+                                                               traceback:nil]);
+  }
+  return FBResponseWithOK();
+}
+#endif
+
++ (id<FBResponsePayload>)handlePerformAccessibilityAudit:(FBRouteRequest *)request
+{
+  NSError *error;
+  NSArray *requestedTypes = request.arguments[@"auditTypes"];
+  NSMutableSet *typesSet = [NSMutableSet set];
+  if (nil == requestedTypes || 0 == [requestedTypes count]) {
+    [typesSet addObject:@"XCUIAccessibilityAuditTypeAll"];
+  } else {
+    [typesSet addObjectsFromArray:requestedTypes];
+  }
+  NSArray *result = [request.session.activeApplication fb_performAccessibilityAuditWithAuditTypesSet:typesSet.copy
+                                                                                               error:&error];
+  if (nil == result) {
+    return FBResponseWithStatus([FBCommandStatus unknownErrorWithMessage:error.description
+                                                               traceback:nil]);
+  }
+  return FBResponseWithObject(result);
 }
 
 @end

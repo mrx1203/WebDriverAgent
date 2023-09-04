@@ -132,22 +132,27 @@
   if (0 == snapshots.count) {
     return @[];
   }
-  NSMutableArray<NSString *> *sortedIds = [NSMutableArray new];
+  NSMutableArray<NSString *> *matchedIds = [NSMutableArray new];
   for (id<FBXCElementSnapshot> snapshot in snapshots) {
-    [sortedIds addObject:(NSString *)[FBXCElementSnapshotWrapper ensureWrapped:snapshot].fb_uid];
+    NSString *uid = [FBXCElementSnapshotWrapper wdUIDWithSnapshot:snapshot];
+    if (nil != uid) {
+      [matchedIds addObject:uid];
+    }
   }
   NSMutableArray<XCUIElement *> *matchedElements = [NSMutableArray array];
   NSString *uid = selfUID;
   if (nil == uid) {
     uid = self.fb_isResolvedFromCache.boolValue
-      ? [FBXCElementSnapshotWrapper ensureWrapped:self.lastSnapshot].fb_uid
+      ? [FBXCElementSnapshotWrapper wdUIDWithSnapshot:self.lastSnapshot]
       : self.fb_uid;
   }
-  if ([sortedIds containsObject:uid]) {
+  if (nil != uid && [matchedIds containsObject:uid]) {
+    XCUIElement *stableSelf = self.fb_stableInstance;
+    stableSelf.fb_isResolvedNatively = @NO;
     if (1 == snapshots.count) {
-      return @[self];
+      return @[stableSelf];
     }
-    [matchedElements addObject:self];
+    [matchedElements addObject:stableSelf];
   }
   XCUIElementType type = XCUIElementTypeAny;
   NSArray<NSNumber *> *uniqueTypes = [snapshots valueForKeyPath:[NSString stringWithFormat:@"@distinctUnionOfObjects.%@", FBStringify(XCUIElement, elementType)]];
@@ -157,35 +162,14 @@
   XCUIElementQuery *query = onlyChildren
     ? [self.fb_query childrenMatchingType:type]
     : [self.fb_query descendantsMatchingType:type];
-  NSPredicate *predicate = [NSPredicate predicateWithBlock:^BOOL(id<FBXCElementSnapshot> snapshot, NSDictionary *bindings) {
-    return [sortedIds containsObject:(NSString *)[FBXCElementSnapshotWrapper ensureWrapped:snapshot].fb_uid];
-  }];
-  query = [query matchingPredicate:predicate];
-  if (1 == snapshots.count) {
-    XCUIElement *result = query.fb_firstMatch;
-    result.fb_isResolvedNatively = @NO;
-    return result ? @[result] : @[];
-  }
-  // Rely here on the fact, that XPath always returns query results in the same
-  // order they appear in the document, which means we don't need to resort the resulting
-  // array. Although, if it turns out this is still not the case then we could always
-  // uncomment the sorting procedure below:
-  //  query = [query sorted:(id)^NSComparisonResult(XCElementSnapshot *a, XCElementSnapshot *b) {
-  //    NSUInteger first = [sortedIds indexOfObject:a.wdUID];
-  //    NSUInteger second = [sortedIds indexOfObject:b.wdUID];
-  //    if (first < second) {
-  //      return NSOrderedAscending;
-  //    }
-  //    if (first > second) {
-  //      return NSOrderedDescending;
-  //    }
-  //    return NSOrderedSame;
-  //  }];
-  NSArray<XCUIElement *> *result = query.fb_allMatches;
-  for (XCUIElement *el in result) {
+  
+  NSPredicate *predicate = [NSPredicate predicateWithFormat:@"%K IN %@",FBStringify(FBXCElementSnapshotWrapper, fb_uid), matchedIds];
+  [matchedElements addObjectsFromArray:[query matchingPredicate:predicate].allElementsBoundByIndex];
+
+  for (XCUIElement *el in matchedElements) {
     el.fb_isResolvedNatively = @NO;
   }
-  return result;
+  return matchedElements.copy;
 }
 
 - (void)fb_waitUntilStable
@@ -211,55 +195,6 @@
     self.application.fb_shouldWaitForQuiescence = previousQuiescence;
   }
   FBConfiguration.waitForIdleTimeout = previousTimeout;
-}
-
-- (NSData *)fb_screenshotWithError:(NSError **)error
-{
-  id<FBXCElementSnapshot> selfSnapshot = self.fb_isResolvedFromCache.boolValue
-    ? self.lastSnapshot
-    : self.fb_takeSnapshot;
-  if (CGRectIsEmpty(selfSnapshot.frame)) {
-    if (error) {
-      *error = [[FBErrorBuilder.builder withDescription:@"Cannot get a screenshot of zero-sized element"] build];
-    }
-    return nil;
-  }
-
-  CGRect elementRect = selfSnapshot.frame;
-#if !TARGET_OS_TV
-  UIInterfaceOrientation orientation = self.application.interfaceOrientation;
-  if (orientation == UIInterfaceOrientationLandscapeLeft || orientation == UIInterfaceOrientationLandscapeRight) {
-    // Workaround XCTest bug when element frame is returned as in portrait mode even if the screenshot is rotated
-    NSArray<id<FBXCElementSnapshot>> *ancestors = [FBXCElementSnapshotWrapper ensureWrapped:selfSnapshot].fb_ancestors;
-    id<FBXCElementSnapshot> parentWindow = nil;
-    if (1 == ancestors.count) {
-      parentWindow = selfSnapshot;
-    } else if (ancestors.count > 1) {
-      parentWindow = [ancestors objectAtIndex:ancestors.count - 2];
-    }
-    if (nil != parentWindow) {
-      CGRect appFrame = ancestors.lastObject.frame;
-      CGRect parentWindowFrame = parentWindow.frame;
-      if (CGRectEqualToRect(appFrame, parentWindowFrame)
-          || (appFrame.size.width > appFrame.size.height && parentWindowFrame.size.width > parentWindowFrame.size.height)
-          || (appFrame.size.width < appFrame.size.height && parentWindowFrame.size.width < parentWindowFrame.size.height)) {
-          CGPoint fixedOrigin = orientation == UIInterfaceOrientationLandscapeLeft ?
-          CGPointMake(appFrame.size.height - elementRect.origin.y - elementRect.size.height, elementRect.origin.x) :
-        CGPointMake(elementRect.origin.y, appFrame.size.width - elementRect.origin.x - elementRect.size.width);
-        elementRect = CGRectMake(fixedOrigin.x, fixedOrigin.y, elementRect.size.height, elementRect.size.width);
-      }
-    }
-  }
-#endif
-
-  // adjust element rect for the actual screen scale
-  XCUIScreen *mainScreen = XCUIScreen.mainScreen;
-  elementRect = CGRectMake(elementRect.origin.x * mainScreen.scale, elementRect.origin.y * mainScreen.scale,
-                           elementRect.size.width * mainScreen.scale, elementRect.size.height * mainScreen.scale);
-
-  return [FBScreenshot takeInOriginalResolutionWithQuality:FBConfiguration.screenshotQuality
-                                                      rect:elementRect
-                                                     error:error];
 }
 
 @end

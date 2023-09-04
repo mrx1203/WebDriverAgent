@@ -61,7 +61,7 @@
 - (void)testIgnoredAccessibilityAttributes
 {
   // Images are neither accessibility elements nor contain them, so both checks should fail
-  XCUIElement *imageElement = self.testedApplication.images.fb_firstMatch;
+  XCUIElement *imageElement = self.testedApplication.images.allElementsBoundByIndex.firstObject;
   XCTAssertTrue(imageElement.exists);
   XCTAssertFalse(imageElement.fb_isAccessibilityElement);
   XCTAssertFalse(imageElement.isWDAccessibilityContainer);
@@ -160,7 +160,8 @@
   XCTAssertNil(element.wdLabel);
   XCTAssertEqualObjects(element.wdValue, @"1");
   XCTAssertFalse(element.wdSelected);
-  XCTAssertTrue([element fb_tapWithError:nil]);
+  XCTAssertTrue(element.wdHittable);
+  [element tap];
   XCTAssertEqualObjects(element.wdValue, @"0");
   XCTAssertFalse(element.wdSelected);
 }

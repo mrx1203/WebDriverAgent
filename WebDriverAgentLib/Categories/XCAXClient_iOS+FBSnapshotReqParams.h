@@ -9,10 +9,18 @@
 
 #import <XCTest/XCTest.h>
 
-#if !TARGET_OS_TV
-@interface XCUICoordinate (FBFix)
+#import "XCAXClient_iOS.h"
 
-- (CGPoint)fb_screenPoint;
+NS_ASSUME_NONNULL_BEGIN
+
+extern NSString *const FBSnapshotMaxDepthKey;
+
+void FBSetCustomParameterForElementSnapshot (NSString* name, id value);
+
+id __nullable FBGetCustomParameterForElementSnapshot (NSString *name);
+
+@interface XCAXClient_iOS (FBSnapshotReqParams)
 
 @end
-#endif
+
+NS_ASSUME_NONNULL_END
