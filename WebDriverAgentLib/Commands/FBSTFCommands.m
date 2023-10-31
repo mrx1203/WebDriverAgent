@@ -28,7 +28,7 @@
 #import "XCUIElement+FBIsVisible.h"
 #import "XCUIElement+FBPickerWheel.h"
 #import "XCUIElement+FBScrolling.h"
-#import "XCUIElement+FBTap.h"
+//#import "XCUIElement+FBTap.h"
 #import "XCUIElement+FBForceTouch.h"
 #import "XCUIElement+FBTyping.h"
 #import "XCUIElement+FBUtilities.h"
@@ -131,23 +131,15 @@ static NSString *const SOURCE_FORMAT_DESCRIPTION = @"description";
 + (id<FBResponsePayload>)handleDragCoordinate_stf:(FBRouteRequest *)request
 {
   XCUIApplication* application = FBApplication.fb_activeApplication;
-  CGPoint startPoint = CGPointMake((CGFloat)[request.arguments[@"fromX"] doubleValue], (CGFloat)[request.arguments[@"fromY"] doubleValue]);
-  CGPoint endPoint = CGPointMake((CGFloat)[request.arguments[@"toX"] doubleValue], (CGFloat)[request.arguments[@"toY"] doubleValue]);
+  CGVector startOffset = CGVectorMake([request.arguments[@"fromX"] doubleValue],
+                                      [request.arguments[@"fromY"] doubleValue]);
+  XCUICoordinate *startCoordinate = [self.class gestureCoordinateWithOffset:startOffset
+                                                                    element:application];
+  CGVector endOffset = CGVectorMake([request.arguments[@"toX"] doubleValue],
+                                    [request.arguments[@"toY"] doubleValue]);
+  XCUICoordinate *endCoordinate = [self.class gestureCoordinateWithOffset:endOffset
+                                                                  element:application];
   NSTimeInterval duration = [request.arguments[@"duration"] doubleValue];
-  
-  CGSize frameSize = application.frame.size;
-  UIInterfaceOrientation orientation = application.interfaceOrientation;
-  if(isSDKVersionLessThan(@"11.0")){
-    endPoint = FBInvertPointForApplication(endPoint, frameSize, orientation);
-  }
-  XCUIElement *element = application.windows.fb_firstMatch;
-  XCUICoordinate *appCoordinate = [[XCUICoordinate alloc] initWithElement:element normalizedOffset:CGVectorMake(0, 0)];
-  XCUICoordinate *endCoordinate  = [[XCUICoordinate alloc] initWithCoordinate:appCoordinate pointsOffset:CGVectorMake(endPoint.x, endPoint.y)];
-  
-  if(isSDKVersionLessThan(@"11.0")){
-    startPoint = FBInvertPointForApplication(startPoint, frameSize, orientation);
-  }
-  XCUICoordinate *startCoordinate  = [[XCUICoordinate alloc] initWithCoordinate:appCoordinate pointsOffset:CGVectorMake(startPoint.x, startPoint.y)];
   [startCoordinate pressForDuration:duration thenDragToCoordinate:endCoordinate];
   return FBResponseWithOK();
 }
@@ -223,5 +215,11 @@ static NSString *const SOURCE_FORMAT_DESCRIPTION = @"description";
                                  });
 }
 
+
++ (XCUICoordinate *)gestureCoordinateWithOffset:(CGVector)offset
+                                        element:(XCUIElement *)element
+{
+  return [[element coordinateWithNormalizedOffset:CGVectorMake(0, 0)] coordinateWithOffset:offset];
+}
 
 @end
