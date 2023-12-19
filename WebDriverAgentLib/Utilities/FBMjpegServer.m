@@ -17,7 +17,8 @@
 #import "FBConfiguration.h"
 #import "FBLogger.h"
 #import "FBScreenshot.h"
-#import "FBImageIOScaler.h"
+#import "FBImageProcessor.h"
+#import "FBImageUtils.h"
 #import "XCUIScreen.h"
 
 static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.1;
@@ -33,7 +34,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
 
 @property (nonatomic, readonly) dispatch_queue_t backgroundQueue;
 @property (nonatomic, readonly) NSMutableArray<GCDAsyncSocket *> *listeningClients;
-@property (nonatomic, readonly) FBImageIOScaler *imageScaler;
+@property (nonatomic, readonly) FBImageProcessor *imageProcessor;
 @property (nonatomic, readonly) long long mainScreenID;
 
 @end
@@ -50,7 +51,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
     dispatch_async(_backgroundQueue, ^{
       [self streamScreenshot];
     });
-    _imageScaler = [[FBImageIOScaler alloc] init];
+    _imageProcessor = [[FBImageProcessor alloc] init];
     _mainScreenID = [XCUIScreen.mainScreen displayID];
   }
   return self;
@@ -84,15 +85,11 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
     }
   }
 
-  CGFloat scalingFactor = [FBConfiguration mjpegScalingFactor] / 100.0f;
-  BOOL usesScaling = fabs(FBMaxScalingFactor - scalingFactor) > DBL_EPSILON;
-  CGFloat compressionQuality = FBConfiguration.mjpegServerScreenshotQuality / 100.0f;
-  // If scaling is applied we perform another JPEG compression after scaling
-  // To get the desired compressionQuality we need to do a lossless compression here
-  CGFloat screenshotCompressionQuality = usesScaling ? FBMaxCompressionQuality : compressionQuality;
   NSError *error;
+  CGFloat compressionQuality = MAX(FBMinCompressionQuality,
+                                   MIN(FBMaxCompressionQuality, FBConfiguration.mjpegServerScreenshotQuality / 100.0));
   NSData *screenshotData = [FBScreenshot takeInOriginalResolutionWithScreenID:self.mainScreenID
-                                                           compressionQuality:screenshotCompressionQuality
+                                                           compressionQuality:compressionQuality
                                                                           uti:UTTypeJPEG
                                                                       timeout:FRAME_TIMEOUT
                                                                         error:&error];
@@ -102,16 +99,13 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
     return;
   }
 
-  if (usesScaling) {
-    [self.imageScaler submitImage:screenshotData
-                    scalingFactor:scalingFactor
-               compressionQuality:compressionQuality
-                completionHandler:^(NSData * _Nonnull scaled) {
-                  [self sendScreenshot:scaled];
-                }];
-  } else {
-    [self sendScreenshot:screenshotData];
-  }
+  CGFloat scalingFactor = FBConfiguration.mjpegScalingFactor / 100.0;
+  [self.imageProcessor submitImageData:screenshotData
+                         scalingFactor:scalingFactor
+                     completionHandler:^(NSData * _Nonnull scaled) {
+    [self sendScreenshot:scaled];
+  }];
+
   [self scheduleNextScreenshotWithInterval:timerInterval timeStarted:timeStarted];
 }
 
@@ -125,6 +119,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
     NSLog(@"%@",e);
   }
   NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString--Content-type: image/jpg--=%ld=",(long)orientation];
+  //NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString\r\nContent-type: image/jpeg\r\nContent-Length: %@\r\n\r\n", @(screenshotData.length)];
   NSMutableData *chunk = [[chunkHeader dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
   [chunk appendData:screenshotData];
   //[chunk appendData:(id)[@"\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding]];
