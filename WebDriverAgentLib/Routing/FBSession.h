@@ -68,6 +68,8 @@ NS_ASSUME_NONNULL_BEGIN
  */
 + (instancetype)initWithApplication:(nullable FBApplication *)application defaultAlertAction:(NSString *)defaultAlertAction;
 
+- (void)setAlertAction:(NSString *)alertAction;
+
 /**
  Kills application associated with that session and removes session
  */

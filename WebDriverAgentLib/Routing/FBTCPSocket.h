@@ -25,7 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
 
  @param client The client, which sent the data
 */
-- (void)didClientSendData:(GCDAsyncSocket *)client;
+- (void)didClientSendData:(GCDAsyncSocket *)client data:(NSData *)data;;
 
 /**
  The callback which is fired when TCP client disconnects

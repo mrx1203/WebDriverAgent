@@ -48,12 +48,17 @@ NSString *const FBDefaultApplicationAuto = @"auto";
 
 - (void)didDetectAlert:(FBAlert *)alert
 {
-  if (nil == self.defaultAlertAction || 0 == self.defaultAlertAction.length) {
+  if (nil == self.defaultAlertAction) {
     return;
   }
 
   NSError *error;
-  if ([self.defaultAlertAction isEqualToString:@"accept"]) {
+  if ([self.defaultAlertAction isKindOfClass:[NSArray class]]){
+    if (![alert actionWithAction:self.defaultAlertAction error:&error]) {
+      [FBLogger logFmt:@"Cannot action the alert. Original error: %@", error.description];
+    }
+  }
+  else if ([self.defaultAlertAction isEqualToString:@"accept"]) {
     if (![alert acceptWithError:&error]) {
       [FBLogger logFmt:@"Cannot accept the alert. Original error: %@", error.description];
     }
@@ -61,7 +66,19 @@ NSString *const FBDefaultApplicationAuto = @"auto";
     if (![alert dismissWithError:&error]) {
       [FBLogger logFmt:@"Cannot dismiss the alert. Original error: %@", error.description];
     }
-  } else {
+  } else if ([self.defaultAlertAction hasPrefix:@"["] && [self.defaultAlertAction hasSuffix:@"]"]) {
+    NSError *jsonError;
+    NSData *objectData = [self.defaultAlertAction dataUsingEncoding:NSUTF8StringEncoding];
+    NSArray<NSDictionary *> *actions = [NSJSONSerialization JSONObjectWithData:objectData options:NSJSONReadingMutableContainers error:&jsonError];
+    if (jsonError) {
+      return ;
+    }
+    self.defaultAlertAction = (NSString*)actions;
+    if (![alert actionWithAction:self.defaultAlertAction error:&error]) {
+      [FBLogger logFmt:@"Cannot action the alert. Original error: %@", error.description];
+    }
+  }
+  else {
     [FBLogger logFmt:@"'%@' default alert action is unsupported", self.defaultAlertAction];
   }
 }
@@ -125,6 +142,30 @@ static FBSession *_activeSession = nil;
   session.defaultAlertAction = [defaultAlertAction lowercaseString];
   [session.alertsMonitor enable];
   return session;
+}
+
+- (void)setAlertAction:(NSString *)alertAction
+{
+  if([alertAction isKindOfClass:[NSArray class]]){
+    self.defaultAlertAction = alertAction;
+  }
+  else if ([alertAction hasPrefix:@"["] && [alertAction hasSuffix:@"]"]) {
+    NSError *jsonError;
+    NSData *objectData = [alertAction dataUsingEncoding:NSUTF8StringEncoding];
+    NSArray<NSDictionary *> *actions = [NSJSONSerialization JSONObjectWithData:objectData options:NSJSONReadingMutableContainers error:&jsonError];
+    if (jsonError) {
+      return ;
+    }
+    self.defaultAlertAction = (NSString*)actions;
+  }
+  else{
+    self.defaultAlertAction = [alertAction lowercaseString];
+  }
+  if(!self.alertsMonitor){
+    self.alertsMonitor = [[FBAlertsMonitor alloc] init];
+    self.alertsMonitor.delegate = (id<FBAlertsMonitorDelegate>)self;
+  }
+  [self.alertsMonitor enable];
 }
 
 - (void)kill

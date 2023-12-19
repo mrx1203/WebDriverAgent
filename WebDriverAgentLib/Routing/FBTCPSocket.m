@@ -72,7 +72,7 @@
 
 - (void)socket:(GCDAsyncSocket *)sock didReadData:(NSData *)data withTag:(long)tag
 {
-  [self.delegate didClientSendData:sock];
+  [self.delegate didClientSendData:sock data:data];
 }
 
 - (void)socketDidDisconnect:(GCDAsyncSocket *)sock withError:(NSError *)err

@@ -37,6 +37,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
 @property (nonatomic, readonly) FBImageProcessor *imageProcessor;
 @property (nonatomic, readonly) long long mainScreenID;
 
+@property (nonatomic) BOOL sendHeader;
 @end
 
 
@@ -53,6 +54,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
     });
     _imageProcessor = [[FBImageProcessor alloc] init];
     _mainScreenID = [XCUIScreen.mainScreen displayID];
+    _sendHeader = TRUE;
   }
   return self;
 }
@@ -112,17 +114,21 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
 - (void)sendScreenshot:(NSData *)screenshotData {
   //NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString\r\nContent-type: image/jpg\r\nContent-Length: %@\r\n\r\n", @(screenshotData.length)];
   UIInterfaceOrientation orientation = UIInterfaceOrientationPortrait;
-  @try {
-    FBApplication *systemApp = FBApplication.fb_activeApplication;
-    orientation = systemApp.interfaceOrientation;
-  }@catch(NSException *e) {
-    NSLog(@"%@",e);
+  NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString\r\nContent-type: image/jpg\r\nContent-Length: %@\r\n\r\n", @(screenshotData.length)];
+  if(!self.sendHeader){
+    @try {
+      FBApplication *systemApp = FBApplication.fb_activeApplication;
+      orientation = systemApp.interfaceOrientation;
+    }@catch(NSException *e) {
+      NSLog(@"%@",e);
+    }
+    chunkHeader = [NSString stringWithFormat:@"--BoundaryString--Content-type: image/jpg--=%ld=",(long)orientation];
   }
-  NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString--Content-type: image/jpg--=%ld=",(long)orientation];
-  //NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString\r\nContent-type: image/jpeg\r\nContent-Length: %@\r\n\r\n", @(screenshotData.length)];
   NSMutableData *chunk = [[chunkHeader dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
   [chunk appendData:screenshotData];
-  //[chunk appendData:(id)[@"\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding]];
+  if(self.sendHeader){
+    [chunk appendData:(id)[@"\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding]];
+  }
   @synchronized (self.listeningClients) {
     for (GCDAsyncSocket *client in self.listeningClients) {
       [client writeData:chunk withTimeout:-1 tag:0];
@@ -137,8 +143,15 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
   [newClient readDataWithTimeout:-1 tag:0];
 }
 
-- (void)didClientSendData:(GCDAsyncSocket *)client
+- (void)didClientSendData:(GCDAsyncSocket *)client data:(NSData *)data
 {
+  NSString *str2 = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+   if([str2 isEqual: @"start send jpeg"]){
+     self.sendHeader = FALSE;
+   }
+   else{
+     self.sendHeader = TRUE;
+   }
   @synchronized (self.listeningClients) {
     if ([self.listeningClients containsObject:client]) {
       return;
@@ -146,8 +159,10 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
   }
 
   [FBLogger logFmt:@"Starting screenshots broadcast for the client at %@:%d", client.connectedHost, client.connectedPort];
-  //NSString *streamHeader = [NSString stringWithFormat:@"HTTP/1.0 200 OK\r\nServer: %@\r\nConnection: close\r\nMax-Age: 0\r\nExpires: 0\r\nCache-Control: no-cache, private\r\nPragma: no-cache\r\nContent-Type: multipart/x-mixed-replace; boundary=--BoundaryString\r\n\r\n", SERVER_NAME];
-  //[client writeData:(id)[streamHeader dataUsingEncoding:NSUTF8StringEncoding] withTimeout:-1 tag:0];
+  if(self.sendHeader){
+    NSString *streamHeader = [NSString stringWithFormat:@"HTTP/1.0 200 OK\r\nServer: %@\r\nConnection: close\r\nMax-Age: 0\r\nExpires: 0\r\nCache-Control: no-cache, private\r\nPragma: no-cache\r\nContent-Type: multipart/x-mixed-replace; boundary=--BoundaryString\r\n\r\n", SERVER_NAME];
+    [client writeData:(id)[streamHeader dataUsingEncoding:NSUTF8StringEncoding] withTimeout:-1 tag:0];
+  }
   @synchronized (self.listeningClients) {
     [self.listeningClients addObject:client];
   }

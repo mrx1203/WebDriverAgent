@@ -275,4 +275,60 @@
   return self.element;
 }
 
+- (BOOL)actionWithAction:(NSString *)action error:(NSError **)error {
+  NSArray<NSDictionary *> *actions = (id)action;
+  for (NSDictionary *act in actions) {
+    BOOL match = NO;
+    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"SELF MATCHES %@", act[@"regex"]];
+    for (NSString *s in [self.text componentsSeparatedByString:@"\n"]) {
+      match = [predicate evaluateWithObject:s];
+      if (match) {
+        break;
+      }
+    }
+    if (match) {
+      id<FBXCElementSnapshot> alertSnapshot = self.alertElement.lastSnapshot;
+      XCUIElement *dismissButton = nil;
+      if (nil == dismissButton) {
+        NSArray<XCUIElement *> *buttons = [self.alertElement.fb_query
+                                           descendantsMatchingType:XCUIElementTypeButton].allElementsBoundByIndex;
+        NSString *errorReason = nil;
+        @try {
+          if (act[@"btns"]) {
+            NSArray<NSString *> *btns = act[@"btns"];
+            for (XCUIElement *btn in buttons) {
+              for (NSString *title in btns) {
+                NSPredicate *btnPredicate = [NSPredicate predicateWithFormat:@"SELF MATCHES %@", title];
+                if ([btnPredicate evaluateWithObject:btn.wdLabel]) {
+                  dismissButton = btn;
+                  break;
+                }
+              }
+              if (dismissButton) {
+                break;
+              }
+            }
+          } else {
+            dismissButton = (self.alertElement.elementType == XCUIElementTypeAlert || [self.class isSafariWebAlertWithSnapshot:alertSnapshot])
+              ? [buttons objectAtIndex:[act[@"index"] integerValue]]
+            : [buttons objectAtIndex:(buttons.count - [act[@"index"] integerValue] - 1)];
+          }
+        } @catch (NSException *ex) {
+          errorReason = ex.reason;
+        }
+        if (nil == dismissButton) {
+          [FBLogger logFmt:@"Original error: %@", errorReason];
+        }
+      }
+      if (nil == dismissButton){
+        return [[[FBErrorBuilder builder]
+            withDescriptionFormat:@"Failed to find dismiss button for alert: %@", self.alertElement]
+                buildError:error];
+      }
+      [dismissButton tap];
+    }
+  }
+  return YES;
+}
+
 @end
