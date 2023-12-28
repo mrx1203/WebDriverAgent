@@ -96,6 +96,7 @@
     [[FBRoute POST:@"/wda/forceTouch"] respondWithTarget:self action:@selector(handleForceTouch:)],
 #endif
     [[FBRoute POST:@"/wda/keys"] respondWithTarget:self action:@selector(handleKeys:)],
+    [[FBRoute POST:@"/wda/keys"].withoutSession respondWithTarget:self action:@selector(handleKeys:)],
   ];
 }
 
@@ -555,7 +556,10 @@
 
 + (id<FBResponsePayload>)handleKeys:(FBRouteRequest *)request
 {
-  NSString *textToType = [request.arguments[@"value"] componentsJoinedByString:@""];
+  NSString *textToType = request.arguments[@"value"];
+  if([request.arguments[@"value"] isKindOfClass:[NSArray class]]){
+    textToType = [request.arguments[@"value"] componentsJoinedByString:@""];
+  }
   NSUInteger frequency = [request.arguments[@"frequency"] unsignedIntegerValue] ?: [FBConfiguration maxTypingFrequency];
   NSError *error;
   if (![FBKeyboard typeText:textToType frequency:frequency error:&error]) {
