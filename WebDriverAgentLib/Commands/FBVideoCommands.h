@@ -7,26 +7,14 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 
-#import <XCTest/XCTest.h>
+#import <Foundation/Foundation.h>
 
-#import "FBIntegrationTestCase.h"
-#import "FBScreen.h"
+#import <WebDriverAgentLib/FBCommandHandler.h>
 
-@interface FBScreenTests : FBIntegrationTestCase
-@end
+NS_ASSUME_NONNULL_BEGIN
 
-@implementation FBScreenTests
-
-- (void)setUp
-{
-  [super setUp];
-  [self launchApplication];
-}
-
-- (void)testScreenScale
-{
-  XCTAssertTrue([FBScreen scale] >= 2);
-}
+@interface FBVideoCommands : NSObject <FBCommandHandler>
 
 @end
 
+NS_ASSUME_NONNULL_END

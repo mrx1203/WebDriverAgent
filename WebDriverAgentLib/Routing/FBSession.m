@@ -18,7 +18,11 @@
 #import "FBElementCache.h"
 #import "FBExceptions.h"
 #import "FBMacros.h"
+#import "FBScreenRecordingContainer.h"
+#import "FBScreenRecordingPromise.h"
+#import "FBScreenRecordingRequest.h"
 #import "FBXCodeCompatibility.h"
+#import "FBXCTestDaemonsProxy.h"
 #import "XCUIApplication+FBQuiescence.h"
 #import "XCUIElement.h"
 
@@ -178,6 +182,15 @@ static FBSession *_activeSession = nil;
     self.alertsMonitor = nil;
   }
 
+  FBScreenRecordingPromise *activeScreenRecording = FBScreenRecordingContainer.sharedInstance.screenRecordingPromise;
+  if (nil != activeScreenRecording) {
+    NSError *error;
+    if (![FBXCTestDaemonsProxy stopScreenRecordingWithUUID:activeScreenRecording.identifier error:&error]) {
+      [FBLogger logFmt:@"%@", error];
+    }
+    [FBScreenRecordingContainer.sharedInstance reset];
+  }
+
   if (nil != self.testedApplication
       && FBConfiguration.shouldTerminateApp
       && self.testedApplication.running
@@ -194,6 +207,13 @@ static FBSession *_activeSession = nil;
 
 - (XCUIApplication *)activeApplication
 {
+  BOOL isAuto = [self.defaultActiveApplication isEqualToString:FBDefaultApplicationAuto];
+  NSString *defaultBundleId = isAuto ? nil : self.defaultActiveApplication;
+
+  if (nil != defaultBundleId && [self applicationStateWithBundleId:defaultBundleId] >= XCUIApplicationStateRunningForeground) {
+    return [self makeApplicationWithBundleId:defaultBundleId];
+  }
+
   if (nil != self.testedApplication) {
     XCUIApplicationState testedAppState = self.testedApplication.state;
     if (testedAppState >= XCUIApplicationStateRunningForeground) {
@@ -205,9 +225,6 @@ static FBSession *_activeSession = nil;
     }
   }
 
-  NSString *defaultBundleId = [self.defaultActiveApplication isEqualToString:FBDefaultApplicationAuto]
-    ? nil
-    : self.defaultActiveApplication;
   return [XCUIApplication fb_activeApplicationWithDefaultBundleId:defaultBundleId];
 }
 
