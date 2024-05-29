@@ -9,7 +9,6 @@
 
 #import "FBSessionCommands.h"
 
-#import "FBApplication.h"
 #import "FBCapabilities.h"
 #import "FBConfiguration.h"
 #import "FBLogger.h"
@@ -17,7 +16,6 @@
 #import "FBRouteRequest.h"
 #import "FBSession.h"
 #import "FBSettings.h"
-#import "FBApplication.h"
 #import "FBRuntimeUtils.h"
 #import "FBActiveAppDetectionPoint.h"
 #import "FBXCodeCompatibility.h"
@@ -138,28 +136,63 @@
   }
 
   NSString *bundleID = capabilities[FB_CAP_BUNDLE_ID];
-  FBApplication *app = nil;
+  NSString *initialUrl = capabilities[FB_CAP_INITIAL_URL];
+  XCUIApplication *app = nil;
   if (bundleID != nil) {
-    app = [[FBApplication alloc] initWithBundleIdentifier:bundleID];
+    app = [[XCUIApplication alloc] initWithBundleIdentifier:bundleID];
     BOOL forceAppLaunch = YES;
     if (nil != capabilities[FB_CAP_FORCE_APP_LAUNCH]) {
       forceAppLaunch = [capabilities[FB_CAP_FORCE_APP_LAUNCH] boolValue];
     }
-    NSUInteger appState = [app fb_state];
-    BOOL isAppRunning = appState >= 2;
+    XCUIApplicationState appState = app.state;
+    BOOL isAppRunning = appState >= XCUIApplicationStateRunningBackground;
     if (!isAppRunning || (isAppRunning && forceAppLaunch)) {
       app.fb_shouldWaitForQuiescence = nil == capabilities[FB_CAP_SHOULD_WAIT_FOR_QUIESCENCE]
         || [capabilities[FB_CAP_SHOULD_WAIT_FOR_QUIESCENCE] boolValue];
       app.launchArguments = (NSArray<NSString *> *)capabilities[FB_CAP_ARGUMENTS] ?: @[];
       app.launchEnvironment = (NSDictionary <NSString *, NSString *> *)capabilities[FB_CAP_ENVIRNOMENT] ?: @{};
-      [app launch];
-      if (![app running]) {
+      if (nil != initialUrl) {
+        if (app.running) {
+          [app terminate];
+        }
+        NSError *openError;
+        if (![XCUIDevice.sharedDevice fb_openUrl:initialUrl
+                                 withApplication:bundleID
+                                           error:&openError]) {
+          NSString *errorMsg = [NSString stringWithFormat:@"Cannot open the URL %@ wuth the %@ application. Original error: %@",
+                                initialUrl, bundleID, openError.description];
+          return FBResponseWithStatus([FBCommandStatus sessionNotCreatedError:errorMsg traceback:nil]);
+        }
+      } else {
+        [app launch];
+      }
+      if (!app.running) {
         NSString *errorMsg = [NSString stringWithFormat:@"Cannot launch %@ application. Make sure the correct bundle identifier has been provided in capabilities and check the device log for possible crash report occurrences", bundleID];
         return FBResponseWithStatus([FBCommandStatus sessionNotCreatedError:errorMsg
                                                                   traceback:nil]);
       }
-    } else if (appState < 4 && !forceAppLaunch) {
-      [app fb_activate];
+    } else if (appState == XCUIApplicationStateRunningBackground && !forceAppLaunch) {
+      if (nil != initialUrl) {
+        NSError *openError;
+        if (![XCUIDevice.sharedDevice fb_openUrl:initialUrl
+                                 withApplication:bundleID
+                                           error:&openError]) {
+          NSString *errorMsg = [NSString stringWithFormat:@"Cannot open the URL %@ with the %@ application. Original error: %@",
+                                initialUrl, bundleID, openError.description];
+          return FBResponseWithStatus([FBCommandStatus sessionNotCreatedError:errorMsg traceback:nil]);
+        }
+      } else {
+        [app activate];
+      }
+    }
+  }
+
+  if (nil != initialUrl && nil == bundleID) {
+    NSError *openError;
+    if (![XCUIDevice.sharedDevice fb_openUrl:initialUrl error:&openError]) {
+      NSString *errorMsg = [NSString stringWithFormat:@"Cannot open the URL %@. Original error: %@",
+                            initialUrl, openError.description];
+      return FBResponseWithStatus([FBCommandStatus sessionNotCreatedError:errorMsg traceback:nil]);
     }
   }
 
@@ -265,7 +298,7 @@
 
 + (id<FBResponsePayload>)handleGetHealthCheck:(FBRouteRequest *)request
 {
-  if (![[XCUIDevice sharedDevice] fb_healthCheckWithApplication:[FBApplication fb_activeApplication]]) {
+  if (![[XCUIDevice sharedDevice] fb_healthCheckWithApplication:[XCUIApplication fb_activeApplication]]) {
     return FBResponseWithUnknownErrorFormat(@"Health check failed");
   }
   return FBResponseWithOK();

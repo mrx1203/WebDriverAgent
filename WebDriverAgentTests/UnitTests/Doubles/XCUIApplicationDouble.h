@@ -7,14 +7,12 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 
-#import "FBBaseActionsSynthesizer.h"
+#import <Foundation/Foundation.h>
 
-NS_ASSUME_NONNULL_BEGIN
+@interface XCUIApplicationDouble : NSObject
+@property (nonatomic, assign, readonly) BOOL didTerminate;
+@property (nonatomic, strong) NSString* bundleID;
+@property (nonatomic) BOOL fb_shouldWaitForQuiescence;
 
-#if !TARGET_OS_TV
-@interface FBAppiumActionsSynthesizer : FBBaseActionsSynthesizer
-
+- (BOOL)running;
 @end
-#endif
-
-NS_ASSUME_NONNULL_END

@@ -1,3 +1,81 @@
+## [7.0.2](https://github.com/appium/WebDriverAgent/compare/v7.0.1...v7.0.2) (2024-02-28)
+
+
+### Miscellaneous Chores
+
+* Tune alert detection if system app is active ([#854](https://github.com/appium/WebDriverAgent/issues/854)) ([857d3de](https://github.com/appium/WebDriverAgent/commit/857d3decf497935098ba6acb61654be1da173b11))
+
+## [7.0.1](https://github.com/appium/WebDriverAgent/compare/v7.0.0...v7.0.1) (2024-02-21)
+
+
+### Miscellaneous Chores
+
+* Simplify the logic of alert element detection ([#851](https://github.com/appium/WebDriverAgent/issues/851)) ([54f91f1](https://github.com/appium/WebDriverAgent/commit/54f91f198e45535ea9d86b7eee40b21f43f84294))
+
+## [7.0.0](https://github.com/appium/WebDriverAgent/compare/v6.1.1...v7.0.0) (2024-02-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* The following REST endpoints have been removed, use W3C actions instead:
+- /wda/touch/perform
+- /wda/touch/multi/perform
+
+### Features
+
+* Remove obsolete MJSONWP touch actions ([#847](https://github.com/appium/WebDriverAgent/issues/847)) ([d77f640](https://github.com/appium/WebDriverAgent/commit/d77f640867155fddbbbc9575f0a77802602865e7))
+
+## [6.1.1](https://github.com/appium/WebDriverAgent/compare/v6.1.0...v6.1.1) (2024-02-11)
+
+
+### Miscellaneous Chores
+
+* Make sure the app under test is restarted if opened from a deep link ([#846](https://github.com/appium/WebDriverAgent/issues/846)) ([88b0a5b](https://github.com/appium/WebDriverAgent/commit/88b0a5b0f8aefa05a7dc28d17faf62c229e0706f))
+
+## [6.1.0](https://github.com/appium/WebDriverAgent/compare/v6.0.0...v6.1.0) (2024-02-10)
+
+
+### Features
+
+* Add a possibility of starting a test with a deep link ([#845](https://github.com/appium/WebDriverAgent/issues/845)) ([aa25e49](https://github.com/appium/WebDriverAgent/commit/aa25e49fa9821960b08e9f4f3ea5891ebdf7d48d))
+
+## [6.0.0](https://github.com/appium/WebDriverAgent/compare/v5.15.8...v6.0.0) (2024-01-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* The  /wda/tap/:uuid endpoint has been replaced by /wda/element/:uuid/tap and /wda/tap ones
+
+### Features
+
+* Add coordinate-based APIs for gesture calls ([#843](https://github.com/appium/WebDriverAgent/issues/843)) ([feda373](https://github.com/appium/WebDriverAgent/commit/feda373b6147d3e87b29dceb871887c77febe76b))
+
+## [5.15.8](https://github.com/appium/WebDriverAgent/compare/v5.15.7...v5.15.8) (2024-01-24)
+
+
+### Bug Fixes
+
+* use arm64 naming for xctestrun ([#840](https://github.com/appium/WebDriverAgent/issues/840)) ([429e154](https://github.com/appium/WebDriverAgent/commit/429e154c28ab2f17685723b02c941efce03984d4))
+
+## [5.15.7](https://github.com/appium/WebDriverAgent/compare/v5.15.6...v5.15.7) (2024-01-16)
+
+
+### Miscellaneous Chores
+
+* **deps-dev:** bump semantic-release from 22.0.12 to 23.0.0 ([#836](https://github.com/appium/WebDriverAgent/issues/836)) ([a3ac2c5](https://github.com/appium/WebDriverAgent/commit/a3ac2c58786955507a34d0adcc4a53cd30f55014))
+
+
+### Code Refactoring
+
+* Ditch FBApplication in favour of XCUIApplication extensions ([#834](https://github.com/appium/WebDriverAgent/issues/834)) ([70a8d98](https://github.com/appium/WebDriverAgent/commit/70a8d98bc15d8fc615455be07fad9c37ff8d430b))
+
+## [5.15.6](https://github.com/appium/WebDriverAgent/compare/v5.15.5...v5.15.6) (2024-01-06)
+
+
+### Miscellaneous Chores
+
+* Update keyboard typing implementation ([#832](https://github.com/appium/WebDriverAgent/issues/832)) ([06cfb3b](https://github.com/appium/WebDriverAgent/commit/06cfb3b2b895a0bec681218fce658bdfcb4d13e9))
+
 ## [5.15.5](https://github.com/appium/WebDriverAgent/compare/v5.15.4...v5.15.5) (2023-12-13)
 
 
