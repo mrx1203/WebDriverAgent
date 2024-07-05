@@ -1,3 +1,46 @@
+## [8.7.6](https://github.com/appium/WebDriverAgent/compare/v8.7.5...v8.7.6) (2024-07-02)
+
+### Miscellaneous Chores
+
+* Simplify xcodebuild lines monitoring ([#916](https://github.com/appium/WebDriverAgent/issues/916)) ([87678f2](https://github.com/appium/WebDriverAgent/commit/87678f260c98b3a3bc3d37017e9ef39098ccb3c4))
+
+## [8.7.5](https://github.com/appium/WebDriverAgent/compare/v8.7.4...v8.7.5) (2024-06-26)
+
+### Bug Fixes
+
+* Respect wdaRemotePort capability for real devices ([#915](https://github.com/appium/WebDriverAgent/issues/915)) ([03ea143](https://github.com/appium/WebDriverAgent/commit/03ea1439a9cc5b6495be60707bc474e3ae9bdb06))
+
+## [8.7.4](https://github.com/appium/WebDriverAgent/compare/v8.7.3...v8.7.4) (2024-06-20)
+
+### Miscellaneous Chores
+
+* Bump chai and chai-as-promised ([#913](https://github.com/appium/WebDriverAgent/issues/913)) ([9086783](https://github.com/appium/WebDriverAgent/commit/90867832ec3077f0036938aa68a168a5702fc90a))
+
+## [8.7.3](https://github.com/appium/WebDriverAgent/compare/v8.7.2...v8.7.3) (2024-06-12)
+
+### Miscellaneous Chores
+
+* **deps:** bump @appium/support from 4.5.0 to 5.0.3 ([#910](https://github.com/appium/WebDriverAgent/issues/910)) ([936005b](https://github.com/appium/WebDriverAgent/commit/936005b458e7b5b64b60d9bda37d45bb5a90e615))
+
+## [8.7.2](https://github.com/appium/WebDriverAgent/compare/v8.7.1...v8.7.2) (2024-06-04)
+
+### Miscellaneous Chores
+
+* **deps-dev:** bump sinon from 17.0.2 to 18.0.0 ([#903](https://github.com/appium/WebDriverAgent/issues/903)) ([87e4ba5](https://github.com/appium/WebDriverAgent/commit/87e4ba5ce3868d99ac889795039936be119ef87a))
+
+## [8.7.1](https://github.com/appium/WebDriverAgent/compare/v8.7.0...v8.7.1) (2024-06-04)
+
+### Miscellaneous Chores
+
+* **deps-dev:** bump semantic-release from 23.1.1 to 24.0.0 and conventional-changelog-conventionalcommits to 8.0.0 ([#908](https://github.com/appium/WebDriverAgent/issues/908)) ([26019ec](https://github.com/appium/WebDriverAgent/commit/26019eca9b7331353e26a1014bc4afcecc0450f3))
+
+## [8.7.0](https://github.com/appium/WebDriverAgent/compare/v8.6.0...v8.7.0) (2024-06-01)
+
+
+### Features
+
+* Add a setting to respect system alerts while detecting active apps ([#907](https://github.com/appium/WebDriverAgent/issues/907)) ([5c82d66](https://github.com/appium/WebDriverAgent/commit/5c82d66890b1a74f9b6f698c87590b2154a6c1bd))
+
 ## [8.6.0](https://github.com/appium/WebDriverAgent/compare/v8.5.7...v8.6.0) (2024-05-17)
 
 
