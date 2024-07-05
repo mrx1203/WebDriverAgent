@@ -13,12 +13,14 @@
 @import UniformTypeIdentifiers;
 
 #import "GCDAsyncSocket.h"
+#import "XCUIApplication.h"
 #import "FBConfiguration.h"
 #import "FBLogger.h"
 #import "FBScreenshot.h"
 #import "FBImageProcessor.h"
 #import "FBImageUtils.h"
 #import "XCUIScreen.h"
+#import "XCUIApplication+FBHelpers.h"
 
 static const NSTimeInterval SCREENSHOT_TIMEOUT = 0.1;
 
@@ -116,7 +118,7 @@ static const char *QUEUE_NAME = "JPEG Screenshots Provider Queue";
   NSString *chunkHeader = [NSString stringWithFormat:@"--BoundaryString\r\nContent-type: image/jpg\r\nContent-Length: %@\r\n\r\n", @(screenshotData.length)];
   if(!self.sendHeader){
     @try {
-      FBApplication *systemApp = FBApplication.fb_activeApplication;
+      XCUIApplication* systemApp = XCUIApplication.fb_activeApplication;
       orientation = systemApp.interfaceOrientation;
     }@catch(NSException *e) {
       NSLog(@"%@",e);

@@ -10,7 +10,7 @@
 #import "FBKeyboard.h"
 
 
-#import "FBApplication.h"
+#import "XCUIApplication.h"
 #import "FBConfiguration.h"
 #import "FBXCTestDaemonsProxy.h"
 #import "FBErrorBuilder.h"

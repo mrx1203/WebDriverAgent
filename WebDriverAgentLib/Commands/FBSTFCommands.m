@@ -9,7 +9,7 @@
 
 #import "FBSTFCommands.h"
 
-#import "FBApplication.h"
+#import "XCUIApplication.h"
 #import "FBConfiguration.h"
 #import "FBKeyboard.h"
 #import "FBRoute.h"
@@ -18,7 +18,6 @@
 #import "FBElementCache.h"
 #import "FBErrorBuilder.h"
 #import "FBSession.h"
-#import "FBApplication.h"
 #import "FBMacros.h"
 #import "FBMathUtils.h"
 #import "FBRuntimeUtils.h"
@@ -70,7 +69,7 @@ static NSString *const SOURCE_FORMAT_DESCRIPTION = @"description";
 
 + (id<FBResponsePayload>)handleGetSourceCommand:(FBRouteRequest *)request
 {
-  FBApplication *application = request.session.activeApplication ?: FBApplication.fb_activeApplication;
+  XCUIApplication *application = request.session.activeApplication ?: XCUIApplication.fb_activeApplication;
   NSString *sourceType = request.parameters[@"format"] ?: SOURCE_FORMAT_XML;
   NSString *sourceScope = request.parameters[@"scope"];
   id result;
@@ -101,7 +100,7 @@ static NSString *const SOURCE_FORMAT_DESCRIPTION = @"description";
 
 + (id<FBResponsePayload>)handleTap_stf:(FBRouteRequest *)request
 {
-  XCUIApplication* application = FBApplication.fb_activeApplication;
+  XCUIApplication* application = XCUIApplication.fb_activeApplication;
   CGPoint tapPoint = CGPointMake((CGFloat)[request.arguments[@"x"] doubleValue], (CGFloat)[request.arguments[@"y"] doubleValue]);
   NSArray<NSDictionary<NSString *, id> *> *tapGesture =
   @[@{
@@ -112,17 +111,16 @@ static NSString *const SOURCE_FORMAT_DESCRIPTION = @"description";
           }
       }
     ];
-  [application fb_performAppiumTouchActions:tapGesture elementCache:nil error:nil];
-  //}
+  [application fb_performW3CActions:tapGesture elementCache:nil error:nil];
   return FBResponseWithOK();
 }
 
 + (id<FBResponsePayload>)handlePerformAppiumTouchActions_stf:(FBRouteRequest *)request
 {
-  XCUIApplication *application = [FBApplication fb_activeApplication];
+  XCUIApplication *application = [XCUIApplication fb_activeApplication];
   NSArray *actions = (NSArray *)request.arguments[@"actions"];
   NSError *error;
-  if (![application fb_performAppiumTouchActions:actions elementCache:nil error:&error]) {
+  if (![application fb_performW3CActions:actions elementCache:nil error:&error]) {
     return FBResponseWithUnknownError(error);
   }
   return FBResponseWithOK();
@@ -130,7 +128,7 @@ static NSString *const SOURCE_FORMAT_DESCRIPTION = @"description";
 
 + (id<FBResponsePayload>)handleDragCoordinate_stf:(FBRouteRequest *)request
 {
-  XCUIApplication* application = FBApplication.fb_activeApplication;
+  XCUIApplication* application = XCUIApplication.fb_activeApplication;
   CGVector startOffset = CGVectorMake([request.arguments[@"fromX"] doubleValue],
                                       [request.arguments[@"fromY"] doubleValue]);
   XCUICoordinate *startCoordinate = [self.class gestureCoordinateWithOffset:startOffset
@@ -172,14 +170,14 @@ static NSString *const SOURCE_FORMAT_DESCRIPTION = @"description";
   }
   
 //  [FBConfiguration setShouldWaitForQuiescence:[requirements[@"shouldWaitForQuiescence"] boolValue]];
-  FBApplication *app = [[FBApplication alloc] initPrivateWithPath:appPath bundleID:bundleID];
-  if (app.fb_state < 2) {
+  XCUIApplication *app = [[XCUIApplication alloc] initPrivateWithPath:appPath bundleID:bundleID];
+  if (app.state < 2) {
 //    app.fb_shouldWaitForQuiescence = FBConfiguration.shouldWaitForQuiescence;
     app.launchArguments = (NSArray<NSString *> *)requirements[@"arguments"] ?: @[];
     app.launchEnvironment =  @{};//(NSDictionary <NSString *, NSString *> *)requirements[@"environment"] ?: @{};
     [app launch];
   } else {
-    [app fb_activate];
+    [app activate];
   }
   if (app.processID == 0) {
     return FBResponseWithUnknownErrorFormat(@"Failed to launch %@ application", bundleID);
@@ -191,9 +189,9 @@ static NSString *const SOURCE_FORMAT_DESCRIPTION = @"description";
 + (id<FBResponsePayload>)handleAppTerminateWithoutSession:(FBRouteRequest *)request
 {
   NSString *bundleIdentifier = request.arguments[@"bundleId"];
-  FBApplication* app = [[FBApplication alloc] initPrivateWithPath:nil bundleID:bundleIdentifier];
+  XCUIApplication* app = [[XCUIApplication alloc] initPrivateWithPath:nil bundleID:bundleIdentifier];
   BOOL result = NO;
-  if (app.fb_state >= 2) {
+  if (app.running) {
     [app terminate];
     result = YES;
   }
