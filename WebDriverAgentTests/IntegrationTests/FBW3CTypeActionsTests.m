@@ -140,18 +140,46 @@
           @{@"type": @"keyUp", @"value": @"N"},
           @{@"type": @"keyDown", @"value": @"B"},
           @{@"type": @"keyUp", @"value": @"B"},
+          @{@"type": @"keyDown", @"value": @"A"},
+          @{@"type": @"keyUp", @"value": @"A"},
           @{@"type": @"keyDown", @"value": @"a"},
           @{@"type": @"keyUp", @"value": @"a"},
+          @{@"type": @"keyDown", @"value": [NSString stringWithFormat:@"%C", 0xE003]},
+          @{@"type": @"keyUp", @"value": [NSString stringWithFormat:@"%C", 0xE003]},
           @{@"type": @"pause", @"duration": @500},
           ],
       },
-      ];
+    ];
   NSError *error;
   XCTAssertTrue([self.testedApplication fb_performW3CActions:typeAction
                                                 elementCache:nil
                                                        error:&error]);
   XCTAssertNil(error);
-  XCTAssertEqualObjects(textField.wdValue, @"🏀NBa");
+  XCTAssertEqualObjects(textField.wdValue, @"🏀NBA");
+}
+
+- (void)testTextTypingWithEmptyActions
+{
+  if (![XCPointerEvent.class fb_areKeyEventsSupported]) {
+    return;
+  }
+
+  XCUIElement *textField = self.testedApplication.textFields[@"aIdentifier"];
+  [textField tap];
+  NSArray<NSDictionary<NSString *, id> *> *typeAction =
+    @[
+      @{
+      @"type": @"pointer",
+      @"id": @"touch",
+      @"actions": @[],
+      },
+    ];
+  NSError *error;
+  XCTAssertTrue([self.testedApplication fb_performW3CActions:typeAction
+                                                elementCache:nil
+                                                       error:&error]);
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(textField.value, @"");
 }
 
 @end

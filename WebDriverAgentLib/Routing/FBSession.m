@@ -33,6 +33,8 @@
  */
 NSString *const FBDefaultApplicationAuto = @"auto";
 
+NSString *const FB_SAFARI_BUNDLE_ID = @"com.apple.mobilesafari";
+
 @interface FBSession ()
 @property (nullable, nonatomic) XCUIApplication *testedApplication;
 @property (nonatomic) BOOL isTestedApplicationExpectedToRun;
@@ -217,8 +219,13 @@ static FBSession *_activeSession = nil;
   if (nil != self.testedApplication) {
     XCUIApplicationState testedAppState = self.testedApplication.state;
     if (testedAppState >= XCUIApplicationStateRunningForeground) {
+      // We look for `SBTransientOverlayWindow` elements for half modals. See https://github.com/appium/WebDriverAgent/pull/946
+      NSPredicate *searchPredicate = [NSPredicate predicateWithFormat:@"%K == %@ OR %K == %@",
+                                      @"elementType", @(XCUIElementTypeAlert), 
+                                      @"identifier", @"SBTransientOverlayWindow"];
       if ([FBConfiguration shouldRespectSystemAlerts]
-          && [XCUIApplication.fb_systemApplication descendantsMatchingType:XCUIElementTypeAlert].count > 0) {
+          && [[XCUIApplication.fb_systemApplication descendantsMatchingType:XCUIElementTypeAny]
+              matchingPredicate:searchPredicate].count > 0) {
         return XCUIApplication.fb_systemApplication;
       }
       return (XCUIApplication *)self.testedApplication;
